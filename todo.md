@@ -38,5 +38,5 @@
 - [ ] Configurar autenticação externa simples e regras de acesso para o time.
 - [ ] Integrar o Worker/Durable Object ao frontend publicado e validar salas, áudio e compartilhamento de tela.
 - [ ] Preparar a configuração de Cloudflare Pages e publicar após confirmação final.
-- [ ] Auditar o conteúdo antes do envio ao repositório público e garantir que nenhum segredo ou arquivo de ambiente seja publicado.
+- [x] Auditar o conteúdo antes do envio ao repositório público e garantir que nenhum segredo ou arquivo de ambiente seja publicado.
 - [ ] Proteger a aplicação publicada com Cloudflare Access e uma lista permitida de e-mails da equipe.

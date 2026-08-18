@@ -1,0 +1,11 @@
+{
+  "name": "vybechat-realtime-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.32.0"
+  }
+}
