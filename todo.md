@@ -1,0 +1,42 @@
+# Project TODO
+
+- [x] Registrar a arquitetura de tempo real, as limitações do ambiente e a estratégia de sinalização WebRTC no README.
+- [x] Analisar a referência visual do Vybe Painel e aplicar seus princípios de cor, espaçamento e hierarquia ao VybeChat.
+- [x] Modelar e migrar as tabelas de categorias, canais, mensagens e associação de participantes.
+- [x] Criar procedimentos protegidos para listar, criar e gerenciar categorias, canais e mensagens persistidas.
+- [x] Configurar Socket.io para presença, digitação, entrega de mensagens e sinalização WebRTC em namespaces de canais.
+- [x] Implementar a presença online, ausente e offline sincronizada por Socket.io.
+- [x] Construir a sidebar dark com categorias, canais, avatares e badges de presença.
+- [x] Implementar chat por canal com histórico persistido, markdown básico, envio em tempo real e indicador de digitação.
+- [x] Implementar sala de chamada em grupo com controles de microfone, câmera e encerramento via WebRTC peer-to-peer.
+- [x] Implementar compartilhamento de tela por getDisplayMedia() e indicador do apresentador ativo.
+- [x] Aplicar tipografia Inter e o sistema visual dark roxo/violeta inspirado no Vybe Painel.
+- [x] Cobrir o domínio de canais e mensagens com testes Vitest e executar testes de tipo e unidade.
+- [x] Validar visualmente a interface em desktop e mobile, corrigir problemas encontrados e criar checkpoint de entrega.
+- [x] Fazer o clique em um canal de voz entrar diretamente na chamada da sala.
+- [x] Exibir avatares, nomes e indicadores de status dos participantes dentro de cada sala de voz ativa.
+- [x] Adicionar um painel compacto de conexão à sala com controles de microfone, câmera e saída, no estilo Discord.
+- [x] Cobrir a lógica de sala ativa com testes e validar a nova experiência em desktop e mobile.
+- [x] Adicionar o controle de iniciar e parar compartilhamento de tela ao painel compacto da sala conectada.
+- [x] Criar uma categoria fixa de salas de voz com Sala Geral e salas pessoais para os integrantes da agência.
+- [x] Cobrir a configuração de salas fixas e validar o painel atualizado em desktop e mobile.
+- [x] Adicionar a sala fixa de voz do Mizinho à categoria Pessoal e validar a configuração.
+- [x] Sincronizar o estado de microfone e atividade de fala dos participantes em cada sala de voz.
+- [x] Exibir indicadores de fala ativa e microfone mutado na sidebar e na visualização da chamada.
+- [x] Cobrir os estados de áudio com testes e validar a interface atualizada.
+- [x] Corrigir a entrada em sala para permitir chamada apenas por áudio quando a câmera estiver indisponível.
+- [x] Exibir mensagens de erro úteis e controles de dispositivo para falhas de câmera ou microfone.
+- [x] Adicionar controle de volume individual para cada fluxo de áudio remoto da chamada.
+- [x] Testar a entrada de áudio e o volume individual, e documentar uma hospedagem compatível com Socket.io e WebRTC.
+- [x] Definir a camada gratuita de sinalização compatível com até seis participantes e documentar seus limites.
+- [x] Adaptar a presença, chat e sinalização WebRTC para a arquitetura destinada ao Vercel.
+- [ ] Preparar configuração de publicação do frontend no Vercel e validar as rotas essenciais.
+- [ ] Publicar somente após confirmação final do destino e do escopo de acesso do time.
+- [ ] Mapear e substituir as dependências do Manus OAuth, tRPC e banco necessárias para o MVP externo.
+- [x] Criar a versão estática do painel preservando a interface atual do VybeChat.
+- [x] Implementar persistência mínima de canais e mensagens no ambiente Cloudflare.
+- [ ] Configurar autenticação externa simples e regras de acesso para o time.
+- [ ] Integrar o Worker/Durable Object ao frontend publicado e validar salas, áudio e compartilhamento de tela.
+- [ ] Preparar a configuração de Cloudflare Pages e publicar após confirmação final.
+- [ ] Auditar o conteúdo antes do envio ao repositório público e garantir que nenhum segredo ou arquivo de ambiente seja publicado.
+- [ ] Proteger a aplicação publicada com Cloudflare Access e uma lista permitida de e-mails da equipe.

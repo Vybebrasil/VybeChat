@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787062455179,
+      "tag": "0000_thin_robbie_robertson",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787063672477,
+      "tag": "0001_dusty_korath",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787063768412,
+      "tag": "0002_omniscient_earthquake",
+      "breakpoints": true
+    }
+  ]
+}
