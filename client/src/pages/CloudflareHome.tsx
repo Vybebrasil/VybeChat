@@ -1,4 +1,5 @@
 import { CallStage } from "@/components/CallStage";
+import { CollaborationDrawer } from "@/components/CollaborationDrawer";
 import { MediaTile } from "@/components/MediaTile";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,12 +10,12 @@ import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
 import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspace";
 import { getRealtimeSocket } from "@/lib/realtime";
 import type { VoiceRoom } from "@/lib/voice-room-state";
-import { Hash, LogOut, Menu, Mic, MicOff, MonitorUp, Phone, SendHorizontal, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Bell, Hash, LogOut, Menu, Mic, MicOff, MonitorUp, Phone, Pin, Search, SendHorizontal, SmilePlus, UserPlus, Video, VideoOff, Volume2, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Profile = { id: string; name: string; email: string };
-type Presence = { userId: string; name: string; status: "online" | "away" | "offline" };
-type ExternalMessage = { id: string; channelId: number; userId: string; authorName: string; content: string; createdAt: string };
+type Presence = { userId: string; name: string; status: "online" | "away" | "offline" | "focus" | "meeting"; statusMessage?: string; role?: "admin" | "moderator" | "member" };
+type ExternalMessage = { id: string; channelId: number; userId: string; authorName: string; content: string; createdAt: string; parentId?: string | null; reactions?: Record<string, string[]> };
 type RemoteStream = { socketId: string; stream: MediaStream };
 type CallPeer = { socketId: string; name: string };
 
@@ -57,6 +58,17 @@ export default function CloudflareHome() {
   const [notice, setNotice] = useState<string | null>(null);
   const [callStageOpen, setCallStageOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<Record<number, string[]>>({});
+  const [threadParent, setThreadParent] = useState<ExternalMessage | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<ExternalMessage[]>([]);
+  const [status, setStatus] = useState<Presence["status"]>("online");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
+  const [pushToTalkKey, setPushToTalkKey] = useState<"Space" | "KeyV">("Space");
+  const [isTransmitting, setIsTransmitting] = useState(false);
+  const [typingNames, setTypingNames] = useState<string[]>([]);
+  const [channelPermissions, setChannelPermissions] = useState<Record<number, { readOnly: boolean; invitePolicy: "admin" | "member" }>>({});
   const socketRef = useRef(getRealtimeSocket());
   const localStreamRef = useRef<MediaStream | null>(null);
   const activeCallRef = useRef<number | null>(null);
@@ -90,14 +102,26 @@ export default function CloudflareHome() {
     if (!profile) return;
     const socket = socketRef.current;
     const announce = () => {
-      socket.emit("presence:join", { userId: profile.id, name: profile.name, status: "online" });
+      socket.emit("presence:join", { userId: profile.id, name: profile.name, status, statusMessage, role: profile.email.includes("gestaovybe") ? "admin" : "member" });
       socket.emit("channel:join", { channelId: selectedChannelId });
     };
     socket.on("connect", announce);
     socket.on("presence:update", (users: Presence[]) => setPresence(users));
     socket.on("voice:rooms", (rooms: VoiceRoom[]) => setVoiceRooms(Object.fromEntries(rooms.map(room => [room.channelId, room.members]))));
     socket.on("message:history", ({ channelId, messages: history }: { channelId: number; messages: ExternalMessage[] }) => setMessages(current => ({ ...current, [channelId]: history })));
-    socket.on("message:new", ({ channelId, message }: { channelId: number; message: ExternalMessage }) => setMessages(current => ({ ...current, [channelId]: [...(current[channelId] ?? []).filter(item => item.id !== message.id), message] })));
+    socket.on("message:new", ({ channelId, message }: { channelId: number; message: ExternalMessage }) => {
+      setMessages(current => ({ ...current, [channelId]: [...(current[channelId] ?? []).filter(item => item.id !== message.id), message] }));
+      if (message.userId !== profile.id && message.content.toLocaleLowerCase().includes(`@${profile.name.toLocaleLowerCase()}`)) setNotice(`${message.authorName} mencionou você em #${findExternalChannel(channelId)?.name ?? "canal"}.`);
+    });
+    socket.on("message:update", ({ channelId, message }: { channelId: number; message: ExternalMessage }) => setMessages(current => ({ ...current, [channelId]: (current[channelId] ?? []).map(item => item.id === message.id ? message : item) })));
+    socket.on("message:pins", ({ channelId, pinnedIds: pins }: { channelId: number; pinnedIds: string[] }) => setPinnedIds(current => ({ ...current, [channelId]: pins })));
+    socket.on("message:search-results", ({ results }: { results: ExternalMessage[] }) => setSearchResults(results));
+    socket.on("channel:permissions", ({ channelId, permissions }: { channelId: number; permissions: { readOnly: boolean; invitePolicy: "admin" | "member" } }) => setChannelPermissions(current => ({ ...current, [channelId]: permissions })));
+    socket.on("typing", ({ channelId, name: typingName, active }: { channelId: number; name: string; active: boolean }) => {
+      if (channelId !== selectedChannelId || typingName === profile.name) return;
+      setTypingNames(current => active ? Array.from(new Set([...current, typingName])) : current.filter(item => item !== typingName));
+    });
+    socket.on("call:invite", ({ channelId, from }: { channelId: number; from: { name: string } }) => setNotice(`${from.name} convidou você para ${findExternalChannel(channelId)?.name ?? "uma sala"}.`));
     socket.on("call:peers", async ({ channelId, peers }: { channelId: number; peers: CallPeer[] }) => {
       if (channelId !== activeCallRef.current) return;
       setCallPeers(Object.fromEntries(peers.map(peer => [peer.socketId, peer])));
@@ -138,13 +162,31 @@ export default function CloudflareHome() {
     socket.connect();
     if (socket.connected) announce();
     return () => {
-      ["connect", "presence:update", "voice:rooms", "message:history", "message:new", "call:peers", "call:peer-joined", "call:offer", "call:answer", "call:ice", "call:peer-left", "call:screen-share", "realtime:error"].forEach(event => socket.off(event));
+      ["connect", "presence:update", "voice:rooms", "message:history", "message:new", "message:update", "message:pins", "message:search-results", "channel:permissions", "typing", "call:invite", "call:peers", "call:peer-joined", "call:offer", "call:answer", "call:ice", "call:peer-left", "call:screen-share", "realtime:error"].forEach(event => socket.off(event));
     };
-  }, [profile, selectedChannelId]);
+  }, [profile, selectedChannelId, status, statusMessage]);
 
   useEffect(() => {
     if (profile && socketRef.current.connected) socketRef.current.emit("channel:join", { channelId: selectedChannelId });
   }, [profile, selectedChannelId]);
+
+  useEffect(() => {
+    if (!pushToTalkEnabled || !activeCallChannelId) return;
+    const updateTransmit = (enabled: boolean) => {
+      localStreamRef.current?.getAudioTracks().forEach(track => { track.enabled = enabled; });
+      setMicrophoneOn(enabled);
+      setIsTransmitting(enabled);
+      socketRef.current.emit("call:audio-state", { channelId: activeCallRef.current, isMuted: !enabled, isSpeaking: enabled });
+    };
+    const down = (event: KeyboardEvent) => {
+      if (event.code === pushToTalkKey && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) { event.preventDefault(); updateTransmit(true); }
+    };
+    const up = (event: KeyboardEvent) => { if (event.code === pushToTalkKey) updateTransmit(false); };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    updateTransmit(false);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+  }, [activeCallChannelId, pushToTalkEnabled, pushToTalkKey]);
 
   const stageParticipants = useMemo(() => {
     const local = localStream && profile ? [{
@@ -192,8 +234,36 @@ export default function CloudflareHome() {
   const sendMessage = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.trim()) return;
-    socketRef.current.emit("message:new", { channelId: selectedChannelId, content: draft.trim() });
+    socketRef.current.emit("message:new", { channelId: selectedChannelId, content: draft.trim(), parentId: threadParent?.id ?? null });
     setDraft("");
+    setThreadParent(null);
+  };
+
+  const reactToMessage = (messageId: string, emoji: string) => socketRef.current.emit("message:reaction", { channelId: selectedChannelId, messageId, emoji });
+  const togglePin = (messageId: string) => socketRef.current.emit("message:pin", { channelId: selectedChannelId, messageId });
+  const searchMessages = (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length >= 2) socketRef.current.emit("message:search", { query: query.trim() });
+    else setSearchResults([]);
+  };
+  const updateStatus = (nextStatus: Presence["status"], nextMessage = statusMessage) => {
+    setStatus(nextStatus);
+    setStatusMessage(nextMessage);
+    socketRef.current.emit("presence:status", { status: nextStatus, statusMessage: nextMessage });
+  };
+  const inviteToCall = (userId: string) => {
+    if (!activeCallChannelId) return;
+    socketRef.current.emit("call:invite", { channelId: activeCallChannelId, userId });
+    setNotice("Convite enviado para a sala de voz.");
+  };
+  const toggleReadOnly = () => {
+    const current = channelPermissions[selectedChannelId] ?? { readOnly: false, invitePolicy: "member" as const };
+    socketRef.current.emit("channel:permissions:update", { channelId: selectedChannelId, readOnly: !current.readOnly, invitePolicy: current.invitePolicy });
+  };
+  const setMemberRole = (userId: string, role: "admin" | "moderator" | "member") => socketRef.current.emit("team:role:update", { userId, role });
+  const toggleInvitePolicy = () => {
+    const current = channelPermissions[selectedChannelId] ?? { readOnly: false, invitePolicy: "member" as const };
+    socketRef.current.emit("channel:permissions:update", { channelId: selectedChannelId, readOnly: current.readOnly, invitePolicy: current.invitePolicy === "admin" ? "member" : "admin" });
   };
 
   const leaveVoice = () => {
@@ -300,6 +370,6 @@ export default function CloudflareHome() {
 
   return <main className="min-h-screen p-0 text-foreground md:p-3"><section className="flex min-h-screen overflow-hidden bg-[#100d16]/90 md:min-h-[calc(100vh-1.5rem)] md:rounded-2xl md:border md:border-white/10 md:shadow-2xl">{mobileSidebarOpen && <button onClick={() => setMobileSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/65 md:hidden" aria-label="Fechar navegação" />}{sidebar}
     <section className="flex min-w-0 flex-1 flex-col"><header className="flex h-[64px] items-center gap-3 border-b border-white/7 px-4 sm:h-[72px] sm:px-6"><button onClick={() => setMobileSidebarOpen(true)} className="grid size-9 place-items-center rounded-lg bg-white/5 text-slate-200 md:hidden" aria-label="Abrir canais"><Menu className="size-4" /></button><Hash className="size-5 text-violet-300" /><div className="min-w-0"><h1 className="truncate font-bold text-white">{selectedChannel?.name}</h1><p className="hidden text-xs text-slate-500 sm:block">Canal externo da Vybe</p></div>{activeCallChannelId && <button onClick={() => setCallStageOpen(true)} className="ml-auto rounded-full border border-violet-300/20 bg-violet-500/12 px-3 py-1.5 text-[11px] font-semibold text-violet-100">Voltar à chamada</button>}<span className={`${activeCallChannelId ? "hidden sm:flex" : "ml-auto flex"} items-center gap-2 rounded-full border border-emerald-300/10 bg-emerald-400/6 px-3 py-1 font-mono text-[10px] text-emerald-300`}><span className="size-1.5 rounded-full bg-emerald-400" />{presence.length} online</span></header>
-      <div className="flex min-h-0 flex-1"><section className="flex min-w-0 flex-1 flex-col"><div className="flex-1 overflow-y-auto p-4 sm:p-7"><div className="mx-auto max-w-4xl"><div className="mb-6 border-b border-white/7 pb-6 sm:mb-8 sm:pb-7"><div className="grid size-14 place-items-center rounded-2xl bg-violet-400/10 text-violet-200"><Hash className="size-7" /></div><h2 className="mt-4 text-2xl font-extrabold text-white">#{selectedChannel?.name}</h2><p className="mt-2 text-sm text-slate-400">Canal sincronizado pelo Cloudflare.</p></div><div className="space-y-5">{(messages[selectedChannelId] ?? []).map(message => <article key={message.id} className="flex gap-3"><Avatar className="size-9"><AvatarFallback className="bg-violet-400/12 text-xs">{initials(message.authorName)}</AvatarFallback></Avatar><div className="min-w-0"><p className="text-sm font-bold text-white">{message.authorName}</p><p className="whitespace-pre-wrap break-words text-sm text-slate-300">{normalizeExternalMessage(message.content)}</p></div></article>)}</div>{notice && <p className="mt-5 rounded-xl border border-amber-300/15 bg-amber-400/10 p-3 text-xs text-amber-100">{notice}</p>}</div></div>{selectedChannel?.type === "text" && <form onSubmit={sendMessage} className="mx-auto flex w-full max-w-4xl gap-2 px-4 pb-4 sm:px-7 sm:pb-6"><Textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder={`Mensagem para #${selectedChannel.name}`} className="min-h-11 resize-none border-white/10 bg-[#1c1625]" rows={1} /><Button size="icon" className="size-11 bg-violet-500"><SendHorizontal className="size-4" /></Button></form>}</section><aside className="hidden w-56 border-l border-white/7 p-4 xl:block"><p className="font-mono text-[10px] font-bold tracking-wider text-slate-500">MEMBROS — {presence.length}</p><div className="mt-4 space-y-2">{presence.map(member => <div key={member.userId} className="flex items-center gap-2"><Avatar className="size-7"><AvatarFallback className="bg-white/5 text-[10px]">{initials(member.name)}</AvatarFallback></Avatar><span className="truncate text-xs text-slate-300">{member.name}</span><span className="ml-auto size-2 rounded-full bg-emerald-400" /></div>)}</div></aside></div></section>
-  </section>{activeCallChannelId && !callStageOpen && <div className="fixed bottom-4 right-4 z-20 w-[min(92vw,360px)]"><button onClick={() => setCallStageOpen(true)} className="w-full overflow-hidden rounded-2xl border border-violet-300/20 bg-[#171120]/98 p-3 text-left shadow-2xl"><span className="flex items-center gap-2 text-xs font-bold text-violet-100"><MonitorUp className="size-4" />Abrir palco da chamada</span>{stageParticipants[0] && <div className="mt-3 h-28 overflow-hidden rounded-xl"><MediaTile {...stageParticipants[0]} className="h-full min-h-0 rounded-xl" /></div>}</button></div>}{activeCallChannelId && callStageOpen && <CallStage roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"} participants={stageParticipants} microphoneOn={microphoneOn} cameraOn={cameraOn} sharingScreen={Boolean(screenStream)} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onLeave={leaveVoice} onMinimize={() => setCallStageOpen(false)} />}</main>;
+      <div className="flex min-h-0 flex-1"><section className="flex min-w-0 flex-1 flex-col"><div className="flex-1 overflow-y-auto p-4 sm:p-7"><div className="mx-auto max-w-4xl"><div className="mb-6 border-b border-white/7 pb-6 sm:mb-8 sm:pb-7"><div className="grid size-14 place-items-center rounded-2xl bg-violet-400/10 text-violet-200"><Hash className="size-7" /></div><h2 className="mt-4 text-2xl font-extrabold text-white">#{selectedChannel?.name}</h2><p className="mt-2 text-sm text-slate-400">Canal sincronizado pelo Cloudflare.</p></div><div className="space-y-5">{(messages[selectedChannelId] ?? []).map(message => <article key={message.id} className="flex gap-3"><Avatar className="size-9"><AvatarFallback className="bg-violet-400/12 text-xs">{initials(message.authorName)}</AvatarFallback></Avatar><div className="min-w-0"><p className="text-sm font-bold text-white">{message.authorName}</p><p className="whitespace-pre-wrap break-words text-sm text-slate-300">{normalizeExternalMessage(message.content)}</p></div></article>)}</div>{typingNames.length > 0 && <p className="mt-4 text-xs italic text-violet-200">{typingNames.join(", ")} está digitando…</p>}{notice && <p className="mt-5 rounded-xl border border-amber-300/15 bg-amber-400/10 p-3 text-xs text-amber-100">{notice}</p>}</div></div>{selectedChannel && (selectedChannel.type === "text" || activeCallChannelId === selectedChannelId) && <form onSubmit={sendMessage} className="mx-auto flex w-full max-w-4xl gap-2 px-4 pb-4 sm:px-7 sm:pb-6"><div className="min-w-0 flex-1">{threadParent && <p className="mb-1 truncate text-[11px] text-violet-200">Respondendo a {threadParent.authorName} · <button type="button" onClick={() => setThreadParent(null)} className="underline">cancelar</button></p>}<Textarea value={draft} onChange={event => { setDraft(event.target.value); socketRef.current.emit("typing", { channelId: selectedChannelId, active: Boolean(event.target.value.trim()) }); }} placeholder={`Mensagem para #${selectedChannel.name}`} className="min-h-11 resize-none border-white/10 bg-[#1c1625]" rows={1} /></div><Button size="icon" className="size-11 bg-violet-500"><SendHorizontal className="size-4" /></Button></form>}</section><aside className="hidden w-56 border-l border-white/7 p-4 xl:block"><p className="font-mono text-[10px] font-bold tracking-wider text-slate-500">MEMBROS — {presence.length}</p><div className="mt-4 space-y-2">{presence.map(member => <div key={member.userId} className="flex items-center gap-2"><Avatar className="size-7"><AvatarFallback className="bg-white/5 text-[10px]">{initials(member.name)}</AvatarFallback></Avatar><span className="truncate text-xs text-slate-300">{member.name}</span><span className="ml-auto size-2 rounded-full bg-emerald-400" /></div>)}</div></aside></div></section>
+  </section><CollaborationDrawer messages={messages[selectedChannelId] ?? []} pinnedIds={pinnedIds[selectedChannelId] ?? []} presence={presence} profileId={profile.id} profileName={profile.name} status={status} statusMessage={statusMessage} searchQuery={searchQuery} searchResults={searchResults} activeCall={Boolean(activeCallChannelId)} pushToTalkEnabled={pushToTalkEnabled} pushToTalkKey={pushToTalkKey} isTransmitting={isTransmitting} canManage={profile.email === "gestaovybe@gmail.com"} readOnly={channelPermissions[selectedChannelId]?.readOnly ?? false} invitePolicy={channelPermissions[selectedChannelId]?.invitePolicy ?? "member"} onStatusChange={updateStatus} onSearch={searchMessages} onReact={reactToMessage} onPin={togglePin} onReply={message => { setThreadParent(message); setNotice(`Respondendo em thread a ${message.authorName}.`); }} onInvite={inviteToCall} onTogglePushToTalk={() => setPushToTalkEnabled(current => !current)} onPushToTalkKeyChange={setPushToTalkKey} onToggleReadOnly={toggleReadOnly} onSetRole={setMemberRole} onToggleInvitePolicy={toggleInvitePolicy} />{activeCallChannelId && !callStageOpen && <div className="fixed bottom-4 right-4 z-20 w-[min(92vw,360px)]"><button onClick={() => setCallStageOpen(true)} className="w-full overflow-hidden rounded-2xl border border-violet-300/20 bg-[#171120]/98 p-3 text-left shadow-2xl"><span className="flex items-center gap-2 text-xs font-bold text-violet-100"><MonitorUp className="size-4" />Abrir palco da chamada</span>{stageParticipants[0] && <div className="mt-3 h-28 overflow-hidden rounded-xl"><MediaTile {...stageParticipants[0]} className="h-full min-h-0 rounded-xl" /></div>}</button></div>}{activeCallChannelId && callStageOpen && <CallStage roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"} participants={stageParticipants} microphoneOn={microphoneOn} cameraOn={cameraOn} sharingScreen={Boolean(screenStream)} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onLeave={leaveVoice} onMinimize={() => setCallStageOpen(false)} />}</main>;
 }

@@ -56,3 +56,14 @@
 - [ ] Validar a experiência completa de chamada e controles no celular pelo mesmo link público.
 - [x] Cobrir o comportamento de tela cheia e a seleção/fixação do palco com testes antes de publicar.
 - [x] Adicionar testes do componente CallStage para fixação, alternância entre palco e grade e acionamento da tela cheia pela interface.
+- [x] Finalizar push-to-talk com atalho configurável e indicador visual explícito de transmissão ativa.
+- [x] Adicionar chat vinculado à chamada, reações rápidas e convites diretos para salas de voz.
+- [x] Criar status personalizados, menções com notificações seletivas e busca de mensagens.
+- [x] Finalizar uma visualização de threads para agrupar e navegar pelas respostas de cada mensagem.
+- [x] Implementar controles reais de permissão e moderação por papel e sala, com enforcement no Worker.
+- [x] Adicionar testes específicos dos novos eventos colaborativos do Worker e validar seus fluxos críticos.
+- [ ] Validar os recursos colaborativos em desktop e celular antes da publicação.
+- [x] Expor atribuição explícita de admin, moderador e membro nos controles de equipe e validar sua persistência.
+- [x] Expor o controle de política de convite por canal e validar seu enforcement no Worker.
+- [x] Criar testes de integração do Durable Object para reações, pins, threads, busca, convites e permissões.
+- [x] Validar em teste de integração a promoção para admin e a persistência do papel após nova presença no Worker.
