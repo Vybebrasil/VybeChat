@@ -8,7 +8,7 @@ const props = { roomName: "Sala Geral", participantCount: 2, microphoneOn: true,
 describe("VoiceContextDock", () => {
   it("mantém controles, foco e seleção de microfone no contexto da conversa", () => {
     render(<VoiceContextDock {...props} />);
-    expect(screen.getByText("Conectado em Sala Geral")).toBeTruthy();
+    expect(screen.getByText("Sala Geral")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Abrir modo foco" }));
     expect(props.onOpenFocus).toHaveBeenCalledOnce();
     fireEvent.change(screen.getByLabelText("Microfone"), { target: { value: "mic-1" } });

@@ -83,8 +83,17 @@ export default function CloudflareHome() {
   const peerConnectionsRef = useRef(new Map<string, RTCPeerConnection>());
 
   const selectedChannel = useMemo(() => findExternalChannel(selectedChannelId), [selectedChannelId]);
-  const activeRoomMembers = activeCallChannelId ? voiceRooms[activeCallChannelId] ?? [] : [];
+  const isContextPreview = window.location.pathname === "/cloudflare-preview" && new URLSearchParams(window.location.search).get("demo") === "1" && new URLSearchParams(window.location.search).get("call") === "1";
+  const activeRoomMembers = activeCallChannelId ? (isContextPreview ? [{ socketId: "preview-vybe", userId: "preview-vybe", name: "Vybe Preview", status: "online" as const, isMuted: false, isSpeaking: false }, { socketId: "preview-paulo", userId: "preview-paulo", name: "Paulo", status: "online" as const, isMuted: false, isSpeaking: true }] : voiceRooms[activeCallChannelId] ?? []) : [];
   const channelMessages = messages[selectedChannelId] ?? [];
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (window.location.pathname === "/cloudflare-preview" && params.get("demo") === "1" && params.get("call") === "1") {
+      setActiveCallChannelId(5);
+      setVoiceRooms({ 5: [{ socketId: "preview-vybe", userId: "preview-vybe", name: "Vybe Preview", status: "online", isMuted: false, isSpeaking: false }, { socketId: "preview-paulo", userId: "preview-paulo", name: "Paulo", status: "online", isMuted: false, isSpeaking: true }] });
+    }
+  }, []);
 
   const createPeer = async (peerId: string, shouldOffer = false) => {
     const existing = peerConnectionsRef.current.get(peerId);

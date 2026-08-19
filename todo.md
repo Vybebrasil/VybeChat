@@ -115,17 +115,20 @@
 - [ ] Implementar um modo contextual/dividido real, mantendo sidebar e conversa visíveis enquanto o palco fica embutido, com alternância explícita para foco fullscreen.
 - [ ] Revalidar com dois participantes reais o áudio bidirecional após entrada e após iniciar/parar compartilhamento de tela.
 - [ ] Publicar as novas regras de mídia e validar uma chamada real bidirecional com dois participantes após a atualização.
-- [ ] Reestruturar a sala de voz como experiência contextual persistente, com membros, chat e controles acessíveis sem abrir um modal de tela inteira.
-- [ ] Criar um modo foco opcional para transmissão, vídeo e compartilhamento de tela, com retorno imediato ao contexto da equipe.
+- [x] Reestruturar a sala de voz como experiência contextual persistente, com membros, chat e controles acessíveis sem abrir um modal de tela inteira.
+- [x] Criar um modo foco opcional para transmissão, vídeo e compartilhamento de tela, com retorno imediato ao contexto da equipe.
 - [ ] Adicionar atalhos de chamada, seleção de dispositivo e controles de qualidade de áudio inspirados em padrões modernos de conferência.
 - [ ] Refinar o fluxo de entrada, presença em sala e estados de microfone/câmera para comunicação contínua e compreensível.
-- [ ] Modernizar a direção visual das superfícies de voz para um produto original, claro e fluido, com interação e animação discretas.
+- [x] Modernizar a direção visual das superfícies de voz para um produto original, claro e fluido, com interação e animação discretas.
 - [ ] Cobrir e validar os fluxos de chamada em desktop e celular antes da publicação.
 - [x] Remover telemetria e ornamentos fixos que competem com conversa, pessoas e chamadas no painel principal.
 - [x] Criar um sistema visual premium minimalista com superfícies translúcidas, profundidade sutil, tipografia limpa e acento laranja restrito a ações e presença.
 - [x] Reorganizar navegação e canal em uma composição editorial simples, com foco real no conteúdo e nos participantes.
 - [x] Redesenhar o estado vazio, compositor e cards de mensagem como interfaces calmas, claras e elegantes.
-- [ ] Unificar a sala de voz e o modo foco na mesma linguagem visual contemporânea, com movimento discreto e controles de alta legibilidade.
+- [x] Aplicar explicitamente a linguagem minimalista premium ao VoiceContextDock e à chamada contextual, além do modo foco.
+- [ ] Validar no fluxo real a continuidade visual entre sala contextual e modo foco com sidebar, conversa e controles legíveis.
+- [ ] Registrar microinterações discretas nos dois modos de chamada antes de concluir a unificação visual.
+- [x] Corrigir a contagem de participantes e a composição do texto no dock contextual de chamada exibido ao lado da conversa.
 - [x] Validar visualmente o redesign minimalista em desktop e celular antes da publicação.
 - [ ] Executar uma validação visual qualificada do redesign final, confirmando identidade própria e hierarquia editorial do canal e estado vazio.
 - [ ] Aprimorar a marca e o estado vazio com elementos proprietários adicionais de VybeChat e registrar evidência visual final.

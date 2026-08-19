@@ -58,8 +58,23 @@ aside.cyber-panel { width: 260px !important; background: rgba(16,16,18,.72) !imp
 .modern-central-trigger { border: 1px solid var(--apple-line) !important; border-radius: 14px !important; background: rgba(24,24,27,.86) !important; color: var(--apple-text) !important; box-shadow: 0 16px 30px rgba(0,0,0,.2) !important; }
 .modern-collaboration-drawer { border-color: var(--apple-line) !important; background: rgba(18,18,21,.96) !important; backdrop-filter: blur(30px); }
 
+.voice-context-dock { border: 1px solid var(--apple-line) !important; border-radius: 16px !important; background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 14px 30px rgba(0,0,0,.14) !important; }
+.voice-context-dock > div:first-child > span { border-radius: 11px !important; background: linear-gradient(145deg, #ff9d0a, #ff7800) !important; color: white !important; box-shadow: 0 8px 20px rgba(255,126,0,.2); }
+.voice-context-dock p:first-of-type { color: var(--apple-text) !important; }
+.voice-context-dock button { border: 1px solid var(--apple-line); transition: transform .18s cubic-bezier(.2,.8,.2,1), background .18s cubic-bezier(.2,.8,.2,1), border-color .18s cubic-bezier(.2,.8,.2,1); }
+.voice-context-dock button:hover { background: rgba(255,255,255,.12) !important; }
+.voice-context-dock button:active { transform: scale(.94); }
+.voice-context-dock label { border: 1px solid var(--apple-line); background: rgba(0,0,0,.16) !important; }
+
 .command-call-stage { background: #080809 !important; }
-.command-call-header, .command-call-dock { border-color: var(--apple-line) !important; background: rgba(20,20,23,.9) !important; backdrop-filter: blur(28px); }
+.command-call-stage { background: radial-gradient(900px 520px at 50% -25%, rgba(255,138,0,.10), transparent 70%), #080809 !important; }
+.command-call-header, .command-call-dock { border-color: var(--apple-line) !important; background: rgba(18,18,20,.84) !important; backdrop-filter: blur(28px); }
+.command-call-header { border-bottom: 1px solid var(--apple-line); }
+.command-call-stage main > div.rounded-2xl { border-color: var(--apple-line) !important; border-radius: 24px !important; background: rgba(255,255,255,.025) !important; box-shadow: 0 26px 70px rgba(0,0,0,.34) !important; }
+.command-call-stage .command-call-dock { border-top: 1px solid var(--apple-line); }
+.command-call-stage button { transition: transform .18s cubic-bezier(.2,.8,.2,1), background .18s cubic-bezier(.2,.8,.2,1), border-color .18s cubic-bezier(.2,.8,.2,1); }
+.command-call-stage button:active { transform: scale(.96); }
+.command-call-stage button[aria-label="Sair da chamada"] { box-shadow: 0 10px 24px rgba(244,63,94,.24); }
 .command-call-dock::before { color: #8e8e93 !important; font-family: Inter, -apple-system, sans-serif !important; letter-spacing: 0 !important; }
 
 @media (max-width: 767px) {
