@@ -13,6 +13,7 @@
       #safari-fallback section { width: min(440px, 100%); border: 1px solid rgba(255, 156, 41, .32); background: rgba(11, 12, 16, .94); padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
       #safari-fallback strong { display: block; color: #ff9b36; font: 700 24px/1.2 system-ui, sans-serif; letter-spacing: .08em; }
       #safari-fallback p { color: #b7a58f; font-size: 14px; line-height: 1.6; }
+      #safari-fallback button { border: 1px solid rgba(255, 156, 41, .5); background: #ff881d; color: #120b05; padding: 11px 14px; font-weight: 800; cursor: pointer; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,7 +26,9 @@
   </head>
 
   <body>
+    <div id="safari-fallback"><section><strong>VYBECHAT</strong><p id="bootstrap-status">Inicializando a central de comunicação da Vybe.</p><button type="button" onclick="location.reload()">RECARREGAR SISTEMA</button></section></div>
     <div id="root"></div>
+    <script>window.addEventListener("error", function () { var status = document.getElementById("bootstrap-status"); if (status) status.textContent = "O navegador interrompeu o carregamento. Recarregue o sistema para tentar novamente."; });</script>
     <script type="module" src="/src/main.tsx"></script>
     <script
       defer

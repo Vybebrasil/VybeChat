@@ -88,3 +88,8 @@
 - [x] Adicionar teste do componente CommandNavigation para estados ativos e ocupação real de salas de voz.
 - [x] Validar visualmente a direção de arte em desktop e celular, corrigindo composição, contraste e interações antes da publicação.
 - [x] Corrigir a composição do estado vazio no celular para separar radar, telemetria e texto sem sobreposição.
+- [x] Reequilibrar o canvas desktop para que sidebar, conteúdo e telemetria respeitem a largura útil sem comprimirem o fluxo central.
+- [x] Converter a telemetria em painel contextual recolhível, preservando foco no chat e mantendo os dados acessíveis.
+- [x] Ajustar escala, espaçamento e comportamento de overflow da Command Deck para Chrome em telas de notebook.
+- [x] Implementar fallback HTML independente do React e diagnóstico de carregamento para Safari antes da montagem da aplicação.
+- [ ] Validar as correções de layout no Chrome e o fallback no Safari antes de publicar.

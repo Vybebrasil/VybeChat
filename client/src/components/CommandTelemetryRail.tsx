@@ -1,4 +1,5 @@
-import { Activity, AudioLines, Hash, Radio, ShieldCheck, Signal, UsersRound } from "lucide-react";
+import React, { useState } from "react";
+import { Activity, AudioLines, ChevronRight, Hash, Radio, ShieldCheck } from "lucide-react";
 
 type Props = {
   channelName: string;
@@ -10,8 +11,10 @@ type Props = {
 };
 
 export function CommandTelemetryRail({ channelName, onlineCount, voiceCount, messageCount, activeCall, operators }: Props) {
-  return <aside className="command-telemetry-rail" aria-label="Telemetria operacional">
-    <header><span>TELEMETRIA</span><i /></header>
+  const [collapsed, setCollapsed] = useState(false);
+  return <aside className={`command-telemetry-rail ${collapsed ? "is-collapsed" : ""}`} aria-label="Telemetria operacional">
+    <header><span>TELEMETRIA</span><button onClick={() => setCollapsed(current => !current)} aria-label={collapsed ? "Expandir telemetria" : "Recolher telemetria"}><ChevronRight className="size-3" /></button><i /></header>
+    {!collapsed && <>
     <section className="command-telemetry-channel"><Hash className="size-4" /><div><small>CANAL EM FOCO</small><strong>#{channelName}</strong></div></section>
     <div className="command-telemetry-stats">
       <article><small>OPERADORES</small><b>{String(onlineCount).padStart(2, "0")}</b><i className="bg-emerald-400" /></article>
@@ -23,5 +26,6 @@ export function CommandTelemetryRail({ channelName, onlineCount, voiceCount, mes
     <section className="command-telemetry-protocol"><ShieldCheck className="size-4" /><div><small>PROTOCOLO ATIVO</small><strong>{activeCall ? "SINC. DE MÍDIA" : "ESCUTA PASSIVA"}</strong></div></section>
     <section className="command-operator-panel"><header><span>OPERADORES</span><b>{operators.length}</b></header>{operators.slice(0, 4).map(operator => <div key={operator.userId}><i className={operator.status === "online" ? "is-online" : ""} /><span>{operator.name}</span><em>{operator.role === "admin" ? "CTRL" : operator.status === "meeting" ? "CALL" : "ON"}</em></div>)}</section>
     <footer className="command-telemetry-footer"><Activity className="size-3.5" /><span>LINK CRIPTOGRAFADO</span><AudioLines className="ml-auto size-3.5" /></footer>
+    </>}
   </aside>;
 }
