@@ -1,6 +1,5 @@
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
-import App from "./App";
 import "./index.css";
 import "./command-deck.css";
 import "./modern-vybe.css";
@@ -14,18 +13,24 @@ function BootstrapGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PublicShellError() {
+  return <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0a0a0b", color: "#f4f4f5", fontFamily: "Inter, system-ui, sans-serif", padding: 24 }}><section style={{ width: "min(420px, 100%)", border: "1px solid #2a2a2e", borderRadius: 24, background: "#141416", padding: 32 }}><strong style={{ display: "block", fontSize: 22 }}>VybeChat não pôde abrir agora.</strong><p style={{ color: "#a1a1aa", lineHeight: 1.6 }}>Tente atualizar a página. Se o problema continuar, a equipe já terá um diagnóstico para corrigir.</p><button type="button" onClick={() => window.location.reload()} style={{ border: 0, borderRadius: 12, background: "#ff7a1a", color: "#1a0c02", fontWeight: 800, padding: "11px 15px", cursor: "pointer" }}>Atualizar página</button></section></main>;
+}
+
 if (isCloudflareRuntime(import.meta.env.VITE_DEPLOY_TARGET, window.location.pathname, window.location.hostname)) {
   completeBootstrap();
-  root.render(<App />);
+  void import("./App").then(({ default: App }) => root.render(<App />)).catch(() => root.render(<PublicShellError />));
 } else {
 void Promise.all([
+  import("./App"),
   import("@tanstack/react-query"),
   import("@trpc/client"),
   import("./lib/trpc"),
   import("./const"),
   import("@shared/const"),
   import("superjson"),
-]).then(([queryModule, trpcModule, trpcBinding, constModule, sharedConst, superjsonModule]) => {
+]).then(([appModule, queryModule, trpcModule, trpcBinding, constModule, sharedConst, superjsonModule]) => {
+  const App = appModule.default;
   const queryClient = new queryModule.QueryClient();
   const redirectToLoginIfUnauthorized = (error: unknown) => {
     if (!(error instanceof trpcModule.TRPCClientError) || error.message !== sharedConst.UNAUTHED_ERR_MSG) return;
