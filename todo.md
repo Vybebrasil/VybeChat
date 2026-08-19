@@ -129,6 +129,9 @@
 - [ ] Validar no fluxo real a continuidade visual entre sala contextual e modo foco com sidebar, conversa e controles legíveis.
 - [ ] Registrar microinterações discretas nos dois modos de chamada antes de concluir a unificação visual.
 - [x] Corrigir a contagem de participantes e a composição do texto no dock contextual de chamada exibido ao lado da conversa.
+- [ ] Investigar a alternância entre telas e o fallback de “Recarregar sistema” na versão publicada.
+- [ ] Remover o fallback agressivo após confirmação de montagem e manter uma única experiência de carregamento estável.
+- [ ] Validar o bootstrap publicado em Chrome e Safari sem alternância, tela vazia ou ação manual de recarga.
 - [x] Validar visualmente o redesign minimalista em desktop e celular antes da publicação.
 - [ ] Executar uma validação visual qualificada do redesign final, confirmando identidade própria e hierarquia editorial do canal e estado vazio.
 - [ ] Aprimorar a marca e o estado vazio com elementos proprietários adicionais de VybeChat e registrar evidência visual final.

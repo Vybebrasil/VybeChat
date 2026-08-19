@@ -15,7 +15,8 @@ function BootstrapGate({ children }: { children: React.ReactNode }) {
 }
 
 if (isCloudflareRuntime(import.meta.env.VITE_DEPLOY_TARGET, window.location.pathname, window.location.hostname)) {
-  root.render(<BootstrapGate><App /></BootstrapGate>);
+  completeBootstrap();
+  root.render(<App />);
 } else {
 void Promise.all([
   import("@tanstack/react-query"),
