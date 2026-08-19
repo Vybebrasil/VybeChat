@@ -139,6 +139,8 @@
 - [ ] Remover do HTML publicado o fallback de recuperação que permanece visível quando o bundle falha.
 - [ ] Criar uma rota estática mínima de diagnóstico e confirmar a entrega do módulo JavaScript correto no Cloudflare Pages.
 - [ ] Validar a montagem pública com cache limpo em Chrome e Safari antes de retomar as melhorias de chamada.
+- [ ] Publicar a correção do import do Toaster no Cloudflare Pages e validar no domínio público que o app monta sem exibir o fallback de recarga.
+- [ ] Verificar no bundle e em Chrome/Safari que a renderização do App externo ocorre normalmente após a correção do Toaster.
 - [x] Validar visualmente o redesign minimalista em desktop e celular antes da publicação.
 - [ ] Executar uma validação visual qualificada do redesign final, confirmando identidade própria e hierarquia editorial do canal e estado vazio.
 - [ ] Aprimorar a marca e o estado vazio com elementos proprietários adicionais de VybeChat e registrar evidência visual final.
