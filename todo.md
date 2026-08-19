@@ -100,3 +100,11 @@
 - [x] Validar visualmente a Central da equipe redesenhada em desktop e celular antes de concluir a modernização completa da colaboração.
 - [x] Construir uma experiência mobile contemporânea, focada em conversa e chamada, sem miniaturizar a interface desktop.
 - [x] Validar visualmente a nova direção em desktop e celular antes da publicação.
+- [ ] Validar com dois participantes reais a entrada simultânea em uma sala, presença e reconexão pelo Worker publicado.
+- [ ] Validar chamada de áudio/vídeo, compartilhamento de tela, tela cheia e volume individual em dispositivos distintos.
+- [ ] Validar chat de canal, reações, threads, convites, push-to-talk e permissões em produção.
+- [ ] Configurar Cloudflare Access com a lista autorizada da equipe e verificar o bloqueio de usuários não permitidos.
+- [x] Remover a obrigatoriedade de e-mail do acesso externo e permitir entrada apenas com nome de usuário.
+- [x] Persistir e restaurar com segurança o nome de usuário no dispositivo, com opção visível de trocar de identidade.
+- [ ] Publicar o acesso por nome de usuário no Cloudflare Pages e validar que o domínio não exige e-mail.
+- [ ] Validar em produção a entrada somente por nome, a restauração após recarga e a ação de sair/trocar identidade.
