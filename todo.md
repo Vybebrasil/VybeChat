@@ -48,4 +48,11 @@
 - [ ] Restringir o VybeChat com uma política Cloudflare Access baseada nos e-mails autorizados da equipe.
 - [ ] Validar em produção chat, presença, chamada por áudio/vídeo e compartilhamento de tela entre dois participantes.
 - [x] Investigar o erro de renderização que deixa o VybeChat em tela branca no Safari após a publicação no Cloudflare Pages.
-- [ ] Corrigir a incompatibilidade identificada, publicar uma nova versão e validar o carregamento no navegador afetado.
+- [x] Corrigir a incompatibilidade identificada, publicar uma nova versão e validar o carregamento no navegador afetado.
+- [x] Criar um palco principal para chamadas, exibindo a tela compartilhada ou o participante fixado em grande formato.
+- [x] Adicionar interação para fixar participantes, ampliar o conteúdo compartilhado e alternar para tela cheia.
+- [x] Organizar uma grade responsiva de participantes com estado de fala, câmera, microfone e volume individual.
+- [x] Reposicionar os controles de chamada em uma barra flutuante acessível e adicionar saída de tela cheia.
+- [ ] Validar a experiência completa de chamada e controles no celular pelo mesmo link público.
+- [x] Cobrir o comportamento de tela cheia e a seleção/fixação do palco com testes antes de publicar.
+- [x] Adicionar testes do componente CallStage para fixação, alternância entre palco e grade e acionamento da tela cheia pela interface.

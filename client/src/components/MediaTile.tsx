@@ -1,5 +1,5 @@
 import { MicOff, MonitorUp, VideoOff, Volume2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { normalizeParticipantVolume, toMediaElementVolume } from "@/lib/participant-volume";
 
 type MediaTileProps = {
@@ -14,6 +14,9 @@ type MediaTileProps = {
   accent?: boolean;
   volume?: number;
   onVolumeChange?: (volume: number) => void;
+  className?: string;
+  selected?: boolean;
+  onSelect?: () => void;
 };
 
 export function MediaTile({
@@ -28,6 +31,9 @@ export function MediaTile({
   accent = false,
   volume = 100,
   onVolumeChange,
+  className = "",
+  selected = false,
+  onSelect,
 }: MediaTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -42,7 +48,7 @@ export function MediaTile({
   }, [volume]);
 
   return (
-    <article className={`relative min-h-[170px] overflow-hidden rounded-2xl border bg-[#14101d] transition-all ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-violet-400/80 shadow-[0_0_28px_rgba(139,92,246,.28)]" : "border-white/10"}`}>
+    <article onClick={onSelect} className={`relative min-h-[170px] overflow-hidden rounded-2xl border bg-[#14101d] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-violet-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-violet-400/80 shadow-[0_0_28px_rgba(139,92,246,.28)]" : "border-white/10"} ${className}`}>
       {stream && cameraOn ? (
         <video ref={videoRef} autoPlay playsInline muted={muted} className="absolute inset-0 h-full w-full object-cover" />
       ) : (

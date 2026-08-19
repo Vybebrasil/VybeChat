@@ -23,3 +23,7 @@ Após a implantação inicial do Pages, será necessário validar a comunicaçã
 ## Publicação inicial do frontend
 
 O Cloudflare Pages publicou o frontend com sucesso em `https://vybechat.pages.dev`. A página de entrada e a interface principal foram abertas em produção; uma sessão temporária de validação exibiu o status de presença com `1 online`, comprovando a ligação entre o bundle estático e o Worker publicado.
+
+## Compatibilidade com Safari
+
+Após um relato de tela branca no Safari, a rota Cloudflare deixou de carregar a página interna e seu renderizador avançado de markdown no bundle inicial. O frontend agora usa carregamento sob demanda para páginas internas, texto nativo para mensagens no painel Cloudflare e alvo de build `safari13`. A correção foi enviada no commit `cdc26e0`; a nova implantação de produção está em processamento e deve ser revalidada no navegador afetado após sua promoção.
