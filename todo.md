@@ -40,8 +40,10 @@
 - [ ] Preparar a configuração de Cloudflare Pages e publicar após confirmação final.
 - [x] Auditar o conteúdo antes do envio ao repositório público e garantir que nenhum segredo ou arquivo de ambiente seja publicado.
 - [ ] Proteger a aplicação publicada com Cloudflare Access e uma lista permitida de e-mails da equipe.
-- [ ] Conectar o Worker ao repositório público usando o diretório raiz cloudflare-worker/vybechat-realtime.
-- [ ] Confirmar a implantação do Worker e o binding VYBECHAT_ROOM do Durable Object.
+- [x] Conectar o Worker ao repositório público usando o diretório raiz cloudflare-worker/vybechat-realtime.
+- [x] Confirmar a implantação do Worker e o binding VYBECHAT_ROOM do Durable Object.
+- [x] Verificar se a versão gerada pela build 76dbfda foi promovida como implantação ativa do Worker.
+- [x] Revalidar a rota de saúde e uma conexão WebSocket após confirmar a nova versão ativa.
 - [ ] Criar o projeto Cloudflare Pages com o comando build:cloudflare e a variável VITE_REALTIME_WORKER_URL.
 - [ ] Restringir o VybeChat com uma política Cloudflare Access baseada nos e-mails autorizados da equipe.
 - [ ] Validar em produção chat, presença, chamada por áudio/vídeo e compartilhamento de tela entre dois participantes.
