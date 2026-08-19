@@ -121,3 +121,12 @@
 - [ ] Refinar o fluxo de entrada, presença em sala e estados de microfone/câmera para comunicação contínua e compreensível.
 - [ ] Modernizar a direção visual das superfícies de voz para um produto original, claro e fluido, com interação e animação discretas.
 - [ ] Cobrir e validar os fluxos de chamada em desktop e celular antes da publicação.
+- [x] Remover telemetria e ornamentos fixos que competem com conversa, pessoas e chamadas no painel principal.
+- [x] Criar um sistema visual premium minimalista com superfícies translúcidas, profundidade sutil, tipografia limpa e acento laranja restrito a ações e presença.
+- [x] Reorganizar navegação e canal em uma composição editorial simples, com foco real no conteúdo e nos participantes.
+- [x] Redesenhar o estado vazio, compositor e cards de mensagem como interfaces calmas, claras e elegantes.
+- [ ] Unificar a sala de voz e o modo foco na mesma linguagem visual contemporânea, com movimento discreto e controles de alta legibilidade.
+- [x] Validar visualmente o redesign minimalista em desktop e celular antes da publicação.
+- [ ] Executar uma validação visual qualificada do redesign final, confirmando identidade própria e hierarquia editorial do canal e estado vazio.
+- [ ] Aprimorar a marca e o estado vazio com elementos proprietários adicionais de VybeChat e registrar evidência visual final.
+- [x] Corrigir a composição do estado vazio no celular para priorizar a mensagem principal e evitar colunas estreitas de metadados.

@@ -1,0 +1,74 @@
+:root {
+  --apple-bg: #060606;
+  --apple-surface: rgba(255, 255, 255, .045);
+  --apple-surface-strong: rgba(255, 255, 255, .075);
+  --apple-line: rgba(255, 255, 255, .09);
+  --apple-text: #f5f5f7;
+  --apple-muted: #98989d;
+  --apple-orange: #ff8a00;
+}
+
+body { background: var(--apple-bg) !important; color: var(--apple-text); font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important; }
+.cyber-grid { background: radial-gradient(900px 700px at 50% -30%, rgba(255, 138, 0, .09), transparent 65%), #060606 !important; }
+.cyber-grid.flex { gap: 0 !important; padding: 0 !important; }
+.cyber-grid.flex > .cyber-panel { border: 0 !important; border-radius: 0 !important; background: rgba(9, 9, 10, .88) !important; box-shadow: none !important; }
+.cyber-grid > .command-telemetry-rail { display: none !important; }
+.cyber-grid .command-telemetry-rail + * { margin: 0 !important; }
+
+aside.cyber-panel { width: 260px !important; background: rgba(16,16,18,.72) !important; border-right: 1px solid var(--apple-line) !important; backdrop-filter: blur(28px); }
+.cyber-grid > .cyber-panel > aside > div:first-child { padding: 22px 20px !important; border-color: var(--apple-line) !important; }
+.cyber-grid > .cyber-panel > aside > div:first-child > div > div > span { border: 0 !important; border-radius: 13px !important; background: linear-gradient(145deg, #ff9d0a, #ff6a00) !important; color: #fff !important; box-shadow: 0 8px 26px rgba(255, 126, 0, .22) !important; }
+.cyber-grid > .cyber-panel > aside > div:first-child h2 { color: var(--apple-text) !important; font-size: 18px !important; letter-spacing: -.03em !important; }
+.cyber-grid > .cyber-panel > aside > div:first-child h2::after { content: "  ·  together"; color: #86868b; font-size: 10px; font-weight: 500; letter-spacing: .01em; }
+.cyber-grid > .cyber-panel > aside > div:first-child .cyber-label { color: #bdbdc2 !important; }
+.cyber-grid > .cyber-panel > aside > div:last-child { border-color: var(--apple-line) !important; background: rgba(255,255,255,.018) !important; }
+
+.cyber-label, .command-nav-group > p { color: #8e8e93 !important; font-family: Inter, -apple-system, sans-serif !important; font-size: 10px !important; font-weight: 700 !important; letter-spacing: .055em !important; }
+.command-nav-group { margin-bottom: 18px !important; }
+.command-nav-group > p { margin: 0 0 8px 12px !important; }
+.command-nav-channel > button { height: 38px !important; border-radius: 10px !important; color: #b5b5bb !important; font-size: 13px !important; transition: background .18s cubic-bezier(.2,.8,.2,1), color .18s cubic-bezier(.2,.8,.2,1), transform .18s cubic-bezier(.2,.8,.2,1) !important; }
+.command-nav-channel > button:hover { background: rgba(255,255,255,.06) !important; color: #fff !important; transform: translateX(2px); }
+.command-nav-channel > button.is-active { background: rgba(255,255,255,.1) !important; color: #fff !important; box-shadow: inset 3px 0 0 var(--apple-orange) !important; }
+.command-nav-channel > button em { color: var(--apple-orange) !important; font-family: inherit !important; }
+
+.cyber-grid > .cyber-panel > section > header { min-height: 72px !important; border-color: var(--apple-line) !important; background: rgba(12,12,14,.68) !important; backdrop-filter: blur(26px); }
+.cyber-grid > .cyber-panel > section > header > div:first-of-type { border: 0 !important; border-radius: 12px !important; background: rgba(255,138,0,.12) !important; color: var(--apple-orange) !important; }
+.cyber-grid > .cyber-panel > section > header h1 { color: var(--apple-text) !important; font-size: 14px !important; }
+.cyber-grid > .cyber-panel > section > header span { border-color: var(--apple-line) !important; background: rgba(255,255,255,.04) !important; color: #d4d4d9 !important; }
+
+.cyber-grid .max-w-4xl { max-width: 920px !important; }
+.cyber-grid .max-w-4xl > div:first-child > div:first-child { padding: 42px 0 28px !important; border-color: var(--apple-line) !important; }
+.cyber-grid .max-w-4xl > div:first-child > div:first-child > div:first-child { display: none !important; }
+.cyber-grid .max-w-4xl > div:first-child > div:first-child h2 { color: var(--apple-text) !important; font-family: Inter, -apple-system, sans-serif !important; font-size: clamp(28px, 4vw, 42px) !important; font-weight: 650 !important; letter-spacing: -.055em !important; }
+.cyber-grid .max-w-4xl > div:first-child > div:first-child > p:last-child { color: var(--apple-muted) !important; font-size: 15px !important; }
+.cyber-grid .cyber-corner.relative.overflow-hidden { display: grid !important; grid-template-columns: 130px minmax(0,1fr) !important; min-height: 238px !important; align-items: center !important; gap: 0 22px !important; padding: 34px !important; border: 1px solid var(--apple-line) !important; border-radius: 22px !important; background: linear-gradient(135deg, rgba(255,255,255,.065), rgba(255,255,255,.02)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 60px rgba(0,0,0,.22) !important; }
+.cyber-grid .cyber-corner.relative.overflow-hidden::before, .cyber-grid .cyber-corner.relative.overflow-hidden::after { display: none !important; }
+.cyber-grid .cyber-corner.relative.overflow-hidden > div:first-child { position: static !important; grid-row: 1 / span 3; display: grid; place-items: center; width: 88px !important; height: 88px !important; border: 1px solid rgba(255,138,0,.22); border-radius: 28px; background: radial-gradient(circle at 28% 22%, rgba(255,169,49,.18), transparent 52%), rgba(255,138,0,.05); color: var(--apple-orange) !important; font-family: "Space Grotesk", Inter, sans-serif; font-size: 44px !important; opacity: 1 !important; }
+.cyber-grid .cyber-corner.relative.overflow-hidden > p:first-of-type { grid-column: 2; color: #b7b7be !important; }
+.cyber-grid .cyber-corner.relative.overflow-hidden > p:not(.cyber-label) { grid-column: 2; max-width: 500px; color: #e2e2e7 !important; font-size: 18px !important; font-weight: 500; line-height: 1.45 !important; }
+.cyber-grid .cyber-corner.relative.overflow-hidden > div:last-child { grid-column: 2; margin-top: 3px !important; color: #8e8e96 !important; }
+
+.cyber-grid form.mx-auto { background: linear-gradient(to top, rgba(9,9,11,.96) 74%, transparent) !important; }
+.cyber-grid form textarea { min-height: 56px !important; border: 1px solid var(--apple-line) !important; border-radius: 18px !important; background: rgba(255,255,255,.045) !important; color: var(--apple-text) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.03) !important; }
+.cyber-grid form textarea:focus { border-color: rgba(255,138,0,.65) !important; box-shadow: 0 0 0 4px rgba(255,138,0,.11) !important; }
+.cyber-grid form button[type="submit"] { border-radius: 18px !important; background: linear-gradient(145deg, #ff9d0a, #ff7800) !important; color: white !important; box-shadow: 0 10px 24px rgba(255,126,0,.24) !important; }
+
+.cyber-grid .w-60 { width: 235px !important; border-color: var(--apple-line) !important; background: rgba(255,255,255,.018) !important; }
+.cyber-grid .w-60 > p { color: #898990 !important; }
+.modern-central-trigger { border: 1px solid var(--apple-line) !important; border-radius: 14px !important; background: rgba(24,24,27,.86) !important; color: var(--apple-text) !important; box-shadow: 0 16px 30px rgba(0,0,0,.2) !important; }
+.modern-collaboration-drawer { border-color: var(--apple-line) !important; background: rgba(18,18,21,.96) !important; backdrop-filter: blur(30px); }
+
+.command-call-stage { background: #080809 !important; }
+.command-call-header, .command-call-dock { border-color: var(--apple-line) !important; background: rgba(20,20,23,.9) !important; backdrop-filter: blur(28px); }
+.command-call-dock::before { color: #8e8e93 !important; font-family: Inter, -apple-system, sans-serif !important; letter-spacing: 0 !important; }
+
+@media (max-width: 767px) {
+  aside.cyber-panel { width: min(84vw, 300px) !important; }
+  .cyber-grid .max-w-4xl > div:first-child > div:first-child { padding: 26px 0 20px !important; }
+  .cyber-grid .cyber-corner.relative.overflow-hidden { display: block !important; min-height: 220px !important; padding: 28px 88px 28px 26px !important; }
+  .cyber-grid .cyber-corner.relative.overflow-hidden > div:first-child { position: absolute !important; right: 20px; top: 20px; width: 50px !important; height: 50px !important; border-radius: 16px; font-size: 24px !important; }
+  .cyber-grid .cyber-corner.relative.overflow-hidden > p:first-of-type { margin-top: 0 !important; }
+  .cyber-grid .cyber-corner.relative.overflow-hidden > p:not(.cyber-label) { max-width: none !important; font-size: 17px !important; }
+  .cyber-grid .cyber-corner.relative.overflow-hidden > div:last-child { display: none !important; }
+  .cyber-grid .w-60 { display: none !important; }
+}

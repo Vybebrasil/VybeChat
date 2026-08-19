@@ -4,6 +4,7 @@ import App from "./App";
 import "./index.css";
 import "./command-deck.css";
 import "./modern-vybe.css";
+import "./apple-vybe.css";
 import { isCloudflareRuntime } from "./lib/runtime-mode";
 
 const root = createRoot(document.getElementById("root")!);
