@@ -5,7 +5,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
-import { getEntrypointForTarget, shouldIncludeSafariFallback } from "./client/src/lib/entrypoint";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -151,21 +150,7 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-function vitePluginEntrypoint(): Plugin {
-  return {
-    name: "vybe-entrypoint-by-target",
-    transformIndexHtml(html) {
-      const target = process.env.VITE_DEPLOY_TARGET;
-      const entrypoint = getEntrypointForTarget(target);
-      const fallback = shouldIncludeSafariFallback(target)
-        ? '<main id="safari-fallback" aria-live="polite"><section><strong>VYBECHAT</strong><p>Inicializando a central de comunicação segura…</p></section></main>'
-        : "";
-      return html.replace("/src/main.tsx", entrypoint).replace("__VYBE_SAFARI_FALLBACK__", fallback);
-    },
-  };
-}
-
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginEntrypoint()];
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
   plugins,
