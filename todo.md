@@ -103,8 +103,15 @@
 - [ ] Validar com dois participantes reais a entrada simultânea em uma sala, presença e reconexão pelo Worker publicado.
 - [ ] Validar chamada de áudio/vídeo, compartilhamento de tela, tela cheia e volume individual em dispositivos distintos.
 - [ ] Validar chat de canal, reações, threads, convites, push-to-talk e permissões em produção.
-- [ ] Configurar Cloudflare Access com a lista autorizada da equipe e verificar o bloqueio de usuários não permitidos.
+- [x] Não configurar Cloudflare Access neste MVP público, conforme orientação do usuário; o acesso usa identidade local por nome de usuário.
 - [x] Remover a obrigatoriedade de e-mail do acesso externo e permitir entrada apenas com nome de usuário.
 - [x] Persistir e restaurar com segurança o nome de usuário no dispositivo, com opção visível de trocar de identidade.
-- [ ] Publicar o acesso por nome de usuário no Cloudflare Pages e validar que o domínio não exige e-mail.
-- [ ] Validar em produção a entrada somente por nome, a restauração após recarga e a ação de sair/trocar identidade.
+- [x] Publicar o acesso por nome de usuário no Cloudflare Pages e validar que o domínio não exige e-mail.
+- [x] Validar em produção a entrada somente por nome, a restauração após recarga e a ação de sair/trocar identidade.
+- [x] Confirmar com o usuário a entrada real na sala de voz, a permissão de mídia e a abertura do palco da chamada.
+- [x] Aplicar restrições de áudio com cancelamento de eco, supressão de ruído e ganho automático na captura de microfone.
+- [ ] Validar e corrigir o fluxo de áudio bidirecional em chamada real com dois participantes após entrada e após iniciar/parar compartilhamento de tela.
+- [ ] Validar em produção diagnósticos por participante via WebRTC stats reais e tornar claros os estados de envio, recebimento, conexão e track.
+- [ ] Implementar um modo contextual/dividido real, mantendo sidebar e conversa visíveis enquanto o palco fica embutido, com alternância explícita para foco fullscreen.
+- [ ] Revalidar com dois participantes reais o áudio bidirecional após entrada e após iniciar/parar compartilhamento de tela.
+- [ ] Publicar as novas regras de mídia e validar uma chamada real bidirecional com dois participantes após a atualização.

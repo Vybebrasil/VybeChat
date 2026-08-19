@@ -7,12 +7,26 @@ export type CallMediaResult = {
 
 type MediaDevicesLike = Pick<MediaDevices, "getUserMedia">;
 
+export const CALL_AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  channelCount: 1,
+};
+
+export const CALL_VIDEO_CONSTRAINTS = {
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
+  frameRate: { ideal: 30, max: 30 },
+  facingMode: "user",
+};
+
 export async function getCallMedia(mediaDevices: MediaDevicesLike): Promise<CallMediaResult> {
   try {
-    const stream = await mediaDevices.getUserMedia({ video: true, audio: true });
+    const stream = await mediaDevices.getUserMedia({ video: CALL_VIDEO_CONSTRAINTS, audio: CALL_AUDIO_CONSTRAINTS });
     return { stream, mode: "camera-and-audio" };
   } catch {
-    const stream = await mediaDevices.getUserMedia({ video: false, audio: true });
+    const stream = await mediaDevices.getUserMedia({ video: false, audio: CALL_AUDIO_CONSTRAINTS });
     return { stream, mode: "audio-only" };
   }
 }

@@ -4,6 +4,7 @@ import { getStageTile, getThumbnailTiles, type CallStageTile as CallStageTileSta
 import { getNextCallStageView, togglePinnedParticipant, type CallStageView } from "@/lib/call-stage-ui";
 import { MediaTile } from "@/components/MediaTile";
 import { isFullscreenActive, toggleFullscreen as toggleDocumentFullscreen, type FullscreenDocumentLike, type FullscreenElementLike } from "@/lib/fullscreen";
+import type { PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 
 type StageParticipant = CallStageTileState & {
   stream: MediaStream | null;
@@ -24,6 +25,7 @@ type CallStageProps = {
   microphoneOn: boolean;
   cameraOn: boolean;
   sharingScreen: boolean;
+  diagnostics?: Record<string, PeerAudioDiagnostics>;
   onToggleMic: () => void;
   onToggleCamera: () => void;
   onShareScreen: () => void;
@@ -37,6 +39,7 @@ export function CallStage({
   microphoneOn,
   cameraOn,
   sharingScreen,
+  diagnostics = {},
   onToggleMic,
   onToggleCamera,
   onShareScreen,
@@ -47,6 +50,7 @@ export function CallStage({
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [view, setView] = useState<CallStageView>("stage");
+  const [rosterOpen, setRosterOpen] = useState(false);
   const selected = useMemo(() => getStageTile(participants, pinnedId), [participants, pinnedId]);
   const thumbnails = useMemo(() => getThumbnailTiles(participants, selected?.id ?? null), [participants, selected?.id]);
 
@@ -81,12 +85,14 @@ export function CallStage({
         <span className="grid size-10 place-items-center rounded-xl border border-white/10 bg-orange-400/10 text-orange-300"><Volume2 className="size-4" /></span>
         <div className="min-w-0"><p className="truncate font-sans text-sm font-semibold text-white">{roomName}</p><p className="text-[11px] text-stone-400">{participants.length} participante{participants.length === 1 ? "" : "s"} na chamada</p></div>
         {selected.sharingScreen && <span className="ml-auto hidden items-center gap-1.5 rounded-full bg-orange-400/15 px-3 py-1.5 text-[11px] font-semibold text-orange-100 sm:flex"><MonitorUp className="size-3.5" />Tela ao vivo</span>}
+        <span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex ${microphoneOn ? "bg-emerald-400/10 text-emerald-200" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${microphoneOn ? "bg-emerald-400" : "bg-rose-400"}`} />{microphoneOn ? "Microfone ativo" : "Microfone pausado"}</span>
+        <button onClick={() => setRosterOpen(current => !current)} className={`grid size-9 place-items-center rounded-lg border text-xs font-bold transition-colors ${rosterOpen ? "border-orange-300/50 bg-orange-400/15 text-orange-100" : "border-white/10 bg-white/5 text-stone-200 hover:bg-white/10"}`} aria-label={rosterOpen ? "Fechar participantes" : "Abrir participantes"}>{participants.length}</button>
         <button onClick={() => setView(getNextCallStageView)} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label={view === "stage" ? "Abrir grade de participantes" : "Abrir palco principal"}>{view === "stage" ? <Grid2X2 className="size-4" /> : <MonitorUp className="size-4" />}</button>
         <button onClick={toggleFullscreen} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label={isFullscreen ? "Sair da tela cheia" : "Abrir em tela cheia"}>{isFullscreen ? <Minimize2 className="size-4" /> : <Pin className="size-4" />}</button>
         <button onClick={onMinimize} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label="Minimizar chamada"><Minimize2 className="size-4" /></button>
       </header>
 
-      <main className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-5">
+      <main className="relative flex min-h-0 flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-5">
         {view === "stage" ? <><div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/70 shadow-[0_0_55px_rgba(0,0,0,.55)]">
           <MediaTile {...selected} sharingScreen={selected.sharingScreen} className="h-full min-h-0 rounded-none border-0" selected />
           <button onClick={() => setPinnedId(current => togglePinnedParticipant(current, selected.id))} className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-white/10"><Pin className="size-3.5" />{pinnedId === selected.id ? "Fixado" : "Fixar"}</button>
@@ -94,6 +100,7 @@ export function CallStage({
         {thumbnails.length > 0 && <div className="flex max-h-[23vh] shrink-0 gap-2 overflow-x-auto pb-1 sm:gap-3">
           {thumbnails.map(participant => <button key={participant.id} onClick={() => setPinnedId(participant.id)} className="h-24 w-36 shrink-0 overflow-hidden rounded-xl border border-white/10 text-left sm:h-28 sm:w-48" aria-label={`Exibir ${participant.label} no palco`}><MediaTile {...participant} sharingScreen={participant.sharingScreen} className="h-full min-h-0 rounded-none" /></button>)}
         </div>}</> : <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">{participants.map(participant => <button key={participant.id} onClick={() => { setPinnedId(participant.id); setView("stage"); }} className="min-h-[180px] overflow-hidden border border-orange-300/20 text-left" aria-label={`Exibir ${participant.label} no palco`}><MediaTile {...participant} sharingScreen={participant.sharingScreen} className="h-full min-h-[180px]" /></button>)}</div>}
+        {rosterOpen && <aside className="absolute bottom-4 right-4 top-4 z-10 w-[min(88vw,288px)] overflow-y-auto rounded-2xl border border-white/10 bg-[#171519]/95 p-3 shadow-2xl backdrop-blur-xl sm:bottom-5 sm:right-5 sm:top-5"><div className="flex items-center justify-between border-b border-white/10 pb-3"><div><p className="text-sm font-semibold text-white">Na chamada</p><p className="mt-0.5 text-[11px] text-stone-400">Diagnóstico de áudio ao vivo</p></div><button onClick={() => setRosterOpen(false)} className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-stone-300">Fechar</button></div><div className="mt-3 space-y-2">{participants.map(participant => { const diagnostic = diagnostics[participant.id]; const detail = participant.isLocal ? (participant.microphoneOn ? "Enviando microfone" : "Microfone pausado") : diagnostic?.connection === "connected" ? diagnostic.receiving ? "Áudio recebendo" : diagnostic.sending ? "Conexão pronta" : "Aguardando áudio" : diagnostic?.connection === "failed" ? "Reconectando" : "Conectando"; return <div key={participant.id} className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[.03] p-2.5"><span className="grid size-8 place-items-center rounded-lg bg-orange-400/10 text-xs font-bold text-orange-100">{participant.label.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold text-white">{participant.label}{participant.isLocal ? " (você)" : ""}</p><p className={`mt-0.5 text-[10px] ${participant.microphoneOn && detail !== "Reconectando" ? "text-emerald-300" : "text-rose-300"}`}>{detail}</p></div><span className={`size-2 rounded-full ${participant.microphoneOn && detail !== "Reconectando" ? "bg-emerald-400" : "bg-rose-400"}`} /></div> })}</div><p className="mt-4 rounded-lg border border-white/8 bg-black/20 p-2.5 text-[10px] leading-4 text-stone-400">Cancelamento de eco, supressão de ruído e ganho automático são solicitados ao navegador de cada participante.</p></aside>}
       </main>
 
       <footer className="command-call-dock flex shrink-0 items-center justify-center gap-2 px-3 py-3 sm:gap-3">

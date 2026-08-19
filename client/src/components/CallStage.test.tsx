@@ -43,6 +43,16 @@ describe("CallStage", () => {
     expect(screen.getByRole("button", { name: "Abrir grade de participantes" })).toBeTruthy();
   });
 
+  it("abre o painel de participantes com o estado de áudio de cada pessoa", () => {
+    render(<CallStage {...commonProps} participants={participants} />);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir participantes" }));
+    expect(screen.getByText("Na chamada")).toBeTruthy();
+    expect(screen.getAllByText("Paulo (você)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Microfone ativo").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Fechar participantes" }));
+    expect(screen.queryByText("Status de áudio ao vivo")).toBeNull();
+  });
+
   it("aciona a entrada e a saída de tela cheia pelos controles da interface", () => {
     const requestFullscreen = vi.fn();
     const exitFullscreen = vi.fn();
