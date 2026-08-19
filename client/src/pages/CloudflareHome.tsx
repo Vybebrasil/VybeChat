@@ -3,10 +3,12 @@ import { CollaborationDrawer } from "@/components/CollaborationDrawer";
 import { CommandTelemetryRail } from "@/components/CommandTelemetryRail";
 import { CommandNavigation } from "@/components/CommandNavigation";
 import { MediaTile } from "@/components/MediaTile";
+import { VoiceContextDock } from "@/components/VoiceContextDock";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { getSelectedAudioTrack, listAudioInputs, type AudioInput } from "@/lib/audio-input";
 import { getCallMedia, getCallMediaErrorMessage } from "@/lib/call-media";
 import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
 import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspace";
@@ -73,6 +75,8 @@ export default function CloudflareHome() {
   const [typingNames, setTypingNames] = useState<string[]>([]);
   const [channelPermissions, setChannelPermissions] = useState<Record<number, { readOnly: boolean; invitePolicy: "admin" | "member" }>>({});
   const [peerAudioDiagnostics, setPeerAudioDiagnostics] = useState<Record<string, PeerAudioDiagnostics>>({});
+  const [audioInputs, setAudioInputs] = useState<AudioInput[]>([]);
+  const [selectedAudioInput, setSelectedAudioInput] = useState("");
   const socketRef = useRef(getRealtimeSocket());
   const localStreamRef = useRef<MediaStream | null>(null);
   const activeCallRef = useRef<number | null>(null);
@@ -186,6 +190,11 @@ export default function CloudflareHome() {
   useEffect(() => {
     if (profile && socketRef.current.connected) socketRef.current.emit("channel:join", { channelId: selectedChannelId });
   }, [profile, selectedChannelId]);
+
+  useEffect(() => {
+    if (!profile || !navigator.mediaDevices?.enumerateDevices) return;
+    void listAudioInputs(navigator.mediaDevices).then(setAudioInputs).catch(() => setAudioInputs([]));
+  }, [profile]);
 
   useEffect(() => {
     if (!pushToTalkEnabled || !activeCallChannelId) return;
@@ -359,6 +368,24 @@ export default function CloudflareHome() {
     setCameraOn(!cameraOn);
   };
 
+  const changeAudioInput = async (deviceId: string) => {
+    setSelectedAudioInput(deviceId);
+    if (!deviceId || !localStreamRef.current) return;
+    try {
+      const { track } = await getSelectedAudioTrack(navigator.mediaDevices, deviceId);
+      track.enabled = microphoneOn;
+      const previousTrack = localStreamRef.current.getAudioTracks()[0];
+      localStreamRef.current.removeTrack(previousTrack);
+      localStreamRef.current.addTrack(track);
+      previousTrack?.stop();
+      await Promise.all(Array.from(peerConnectionsRef.current.values()).map(peer => peer.getSenders().find(sender => sender.track?.kind === "audio")?.replaceTrack(track)));
+      setLocalStream(new MediaStream(localStreamRef.current.getTracks()));
+      setNotice("Microfone atualizado para esta chamada.");
+    } catch (error) {
+      setNotice(getCallMediaErrorMessage(error));
+    }
+  };
+
   const shareScreen = async () => {
     if (!activeCallRef.current) return;
     if (screenStream) {
@@ -402,7 +429,7 @@ export default function CloudflareHome() {
   const sidebar = <aside className={`${mobileSidebarOpen ? "fixed inset-y-0 left-0 z-40 flex w-[292px] shadow-2xl" : "hidden"} cyber-panel flex-col bg-[#0a0b0f]/98 md:relative md:flex md:w-[292px] md:shrink-0`}>
     <div className="border-b border-orange-300/15 px-5 py-5"><div className="flex items-start justify-between"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl border border-orange-300/45 bg-orange-400/10 text-sm font-extrabold text-orange-300">V</span><div><p className="cyber-label">Equipe Vybe</p><h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-orange-100">VybeChat</h2></div></div><button onClick={() => setMobileSidebarOpen(false)} className="grid size-8 rounded-lg border border-orange-300/15 text-orange-200 md:hidden" aria-label="Fechar canais"><X className="size-4" /></button></div><div className="mt-4 flex items-center gap-2 text-xs text-stone-400"><span className="size-1.5 rounded-full bg-emerald-400" />Todos os sistemas online</div></div>
     <div className="flex-1 overflow-y-auto px-3 py-4"><CommandNavigation groups={EXTERNAL_WORKSPACE} selectedChannelId={selectedChannelId} voiceRooms={voiceRooms} onSelectText={selectChannel} onJoinVoice={joinVoice} /></div>
-    {activeCallChannelId && <div className="border-y border-orange-300/15 bg-orange-400/5 p-3"><button onClick={() => setCallStageOpen(true)} className="w-full text-left"><p className="cyber-label text-orange-300">Link de voz ativo</p><p className="mt-1 text-xs font-bold text-orange-50">{findExternalChannel(activeCallChannelId)?.name}</p></button><div className="mt-3 flex gap-1.5"><button onClick={toggleMic} className={`grid size-9 place-items-center border ${microphoneOn ? "border-orange-300/20 bg-white/5 text-orange-100" : "border-rose-500/30 bg-rose-500/15 text-rose-200"}`}>{microphoneOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}</button><button onClick={toggleCamera} className={`grid size-9 place-items-center border ${cameraOn ? "border-orange-300/20 bg-white/5 text-orange-100" : "border-rose-500/30 bg-rose-500/15 text-rose-200"}`}>{cameraOn ? <Video className="size-4" /> : <VideoOff className="size-4" />}</button><button onClick={shareScreen} className={`grid size-9 place-items-center border ${screenStream ? "border-orange-300/50 bg-orange-400/20 text-orange-100" : "border-orange-300/20 bg-white/5 text-orange-100"}`}><MonitorUp className="size-4" /></button><button onClick={leaveVoice} className="ml-auto grid size-9 place-items-center bg-rose-500 text-white"><Phone className="size-4 rotate-[135deg]" /></button></div></div>}
+    {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
     <div className="flex items-center gap-2 border-t border-orange-300/15 p-3"><Avatar className="size-9"><AvatarFallback className="rounded-xl border border-orange-300/25 bg-orange-400/10 text-xs text-orange-100">{initials(profile.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-orange-50">{profile.name}</p><p className="text-[11px] text-emerald-400">Online</p></div><button onClick={() => { leaveVoice(); localStorage.removeItem(PROFILE_KEY); setProfile(null); }} aria-label="Sair"><LogOut className="size-4 text-stone-500" /></button></div>
   </aside>;
 

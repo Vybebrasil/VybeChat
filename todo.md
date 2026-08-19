@@ -115,3 +115,9 @@
 - [ ] Implementar um modo contextual/dividido real, mantendo sidebar e conversa visíveis enquanto o palco fica embutido, com alternância explícita para foco fullscreen.
 - [ ] Revalidar com dois participantes reais o áudio bidirecional após entrada e após iniciar/parar compartilhamento de tela.
 - [ ] Publicar as novas regras de mídia e validar uma chamada real bidirecional com dois participantes após a atualização.
+- [ ] Reestruturar a sala de voz como experiência contextual persistente, com membros, chat e controles acessíveis sem abrir um modal de tela inteira.
+- [ ] Criar um modo foco opcional para transmissão, vídeo e compartilhamento de tela, com retorno imediato ao contexto da equipe.
+- [ ] Adicionar atalhos de chamada, seleção de dispositivo e controles de qualidade de áudio inspirados em padrões modernos de conferência.
+- [ ] Refinar o fluxo de entrada, presença em sala e estados de microfone/câmera para comunicação contínua e compreensível.
+- [ ] Modernizar a direção visual das superfícies de voz para um produto original, claro e fluido, com interação e animação discretas.
+- [ ] Cobrir e validar os fluxos de chamada em desktop e celular antes da publicação.
