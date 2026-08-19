@@ -28,7 +28,7 @@ describe("CollaborationDrawer", () => {
   it("abre a central e aciona busca, push-to-talk e convite", () => {
     render(<CollaborationDrawer {...props} />);
     fireEvent.click(screen.getByRole("button", { name: "Central" }));
-    fireEvent.change(screen.getByPlaceholderText("Buscar mensagens"), { target: { value: "decisão" } });
+    fireEvent.change(screen.getByPlaceholderText("Buscar transmissões"), { target: { value: "decisão" } });
     fireEvent.click(screen.getByRole("button", { name: /Push-to-talk/ }));
     fireEvent.change(screen.getByDisplayValue("Espaço"), { target: { value: "KeyV" } });
     fireEvent.click(screen.getByRole("button", { name: /Vinícius/ }));
