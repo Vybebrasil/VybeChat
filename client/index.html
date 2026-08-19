@@ -9,11 +9,11 @@
     <title>VybeChat — Central de comunicação</title>
     <style>
       html, body { min-height: 100%; margin: 0; background: #07080b; color: #ffd39d; }
-      #safari-fallback { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; font-family: system-ui, sans-serif; background: radial-gradient(ellipse at 50% -25%, rgba(255, 123, 10, .2), transparent 42rem), #07080b; }
+      #safari-fallback { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 24px; box-sizing: border-box; font-family: system-ui, sans-serif; background: radial-gradient(ellipse at 50% -25%, rgba(255, 123, 10, .2), transparent 42rem), #07080b; transition: opacity .22s ease, visibility .22s ease; }
+      #safari-fallback.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
       #safari-fallback section { width: min(440px, 100%); border: 1px solid rgba(255, 156, 41, .32); background: rgba(11, 12, 16, .94); padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
       #safari-fallback strong { display: block; color: #ff9b36; font: 700 24px/1.2 system-ui, sans-serif; letter-spacing: .08em; }
       #safari-fallback p { color: #b7a58f; font-size: 14px; line-height: 1.6; }
-      #safari-fallback button { border: 1px solid rgba(255, 156, 41, .5); background: #ff881d; color: #120b05; padding: 11px 14px; font-weight: 800; cursor: pointer; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,9 +26,9 @@
   </head>
 
   <body>
-    <div id="safari-fallback"><section><strong>VYBECHAT</strong><p id="bootstrap-status">Inicializando a central de comunicação da Vybe.</p><button type="button" onclick="location.reload()">RECARREGAR SISTEMA</button></section></div>
+    <div id="safari-fallback"><section><strong>VYBECHAT</strong><p id="bootstrap-status">Inicializando a central de comunicação da Vybe.</p></section></div>
     <div id="root"></div>
-    <script>window.addEventListener("error", function () { var status = document.getElementById("bootstrap-status"); if (status) status.textContent = "O navegador interrompeu o carregamento. Recarregue o sistema para tentar novamente."; });</script>
+    <script>(function(){var fallback=document.getElementById("safari-fallback");var dismiss=function(){if(fallback)fallback.classList.add("is-hidden")};window.addEventListener("vybechat:ready",dismiss);window.addEventListener("DOMContentLoaded",function(){window.setTimeout(dismiss,1600)});window.addEventListener("error",function(){window.setTimeout(dismiss,300)});})();</script>
     <script type="module" src="/src/main.tsx"></script>
     <script
       defer

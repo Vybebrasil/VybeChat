@@ -7,7 +7,10 @@ import "./apple-vybe.css";
 import { isCloudflareRuntime } from "./lib/runtime-mode";
 
 const root = createRoot(document.getElementById("root")!);
-const completeBootstrap = () => document.getElementById("safari-fallback")?.remove();
+const completeBootstrap = () => {
+  document.getElementById("safari-fallback")?.remove();
+  window.dispatchEvent(new Event("vybechat:ready"));
+};
 function BootstrapGate({ children }: { children: React.ReactNode }) {
   useEffect(() => { completeBootstrap(); }, []);
   return <>{children}</>;
