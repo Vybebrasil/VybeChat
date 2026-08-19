@@ -76,8 +76,8 @@ export function CallStage({
   if (!selected) return null;
 
   return (
-    <section ref={stageRef} className="cyber-grid fixed inset-0 z-50 flex min-h-screen flex-col bg-[#07080b] text-white">
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-orange-300/20 bg-[#0c0d10]/96 px-3 sm:px-5">
+    <section ref={stageRef} className="command-call-stage fixed inset-0 z-50 flex min-h-screen flex-col text-white">
+      <header className="command-call-header flex h-16 shrink-0 items-center gap-3 px-3 sm:px-5">
         <span className="grid size-9 place-items-center border border-orange-300/30 bg-orange-400/10 text-orange-300"><Volume2 className="size-4" /></span>
         <div className="min-w-0"><p className="truncate [font-family:Orbitron] text-sm font-bold tracking-wide text-orange-50">{roomName}</p><p className="font-mono text-[10px] uppercase tracking-wider text-orange-300/65">{participants.length} participante{participants.length === 1 ? "" : "s"} no link</p></div>
         {selected.sharingScreen && <span className="ml-auto hidden items-center gap-1.5 border border-orange-300/30 bg-orange-400/10 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-orange-100 sm:flex"><MonitorUp className="size-3.5" />Tela ao vivo</span>}
@@ -96,7 +96,7 @@ export function CallStage({
         </div>}</> : <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">{participants.map(participant => <button key={participant.id} onClick={() => { setPinnedId(participant.id); setView("stage"); }} className="min-h-[180px] overflow-hidden border border-orange-300/20 text-left" aria-label={`Exibir ${participant.label} no palco`}><MediaTile {...participant} sharingScreen={participant.sharingScreen} className="h-full min-h-[180px]" /></button>)}</div>}
       </main>
 
-      <footer className="flex shrink-0 items-center justify-center gap-2 border-t border-orange-300/20 bg-[#0c0d10]/96 px-3 py-3 sm:gap-3">
+      <footer className="command-call-dock flex shrink-0 items-center justify-center gap-2 px-3 py-3 sm:gap-3">
         <button onClick={onToggleMic} className={`grid size-11 place-items-center border transition-colors ${microphoneOn ? "border-orange-300/20 bg-white/5 text-orange-100 hover:bg-orange-400/10" : "border-rose-500/30 bg-rose-500/20 text-rose-100"}`} aria-label={microphoneOn ? "Desligar microfone" : "Ligar microfone"}>{microphoneOn ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
         <button onClick={onToggleCamera} className={`grid size-11 place-items-center border transition-colors ${cameraOn ? "border-orange-300/20 bg-white/5 text-orange-100 hover:bg-orange-400/10" : "border-rose-500/30 bg-rose-500/20 text-rose-100"}`} aria-label={cameraOn ? "Desligar câmera" : "Ligar câmera"}>{cameraOn ? <Video className="size-5" /> : <VideoOff className="size-5" />}</button>
         <button onClick={onShareScreen} className={`flex h-11 items-center gap-2 border px-3 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${sharingScreen ? "border-orange-300 bg-orange-500 text-black" : "border-orange-300/20 bg-white/5 text-orange-100 hover:bg-orange-400/10"}`}><MonitorUp className="size-5" /><span className="hidden sm:inline">{sharingScreen ? "Parar transmissão" : "Compartilhar tela"}</span></button>

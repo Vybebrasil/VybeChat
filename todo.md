@@ -67,3 +67,24 @@
 - [x] Expor o controle de política de convite por canal e validar seu enforcement no Worker.
 - [x] Criar testes de integração do Durable Object para reações, pins, threads, busca, convites e permissões.
 - [x] Validar em teste de integração a promoção para admin e a persistência do papel após nova presença no Worker.
+- [ ] Investigar e eliminar a nova ocorrência de tela escura sem renderização no Safari publicado.
+- [x] Recriar a identidade visual em preto e laranja com linguagem cyberpunk de centro de comando inspirada em HUD/Jarvis.
+- [x] Redesenhar sidebar, cabeçalho, chat, controles de chamada e central colaborativa com painéis técnicos, brilho e hierarquia mais imersiva.
+- [ ] Garantir contraste, responsividade e estabilidade da nova identidade em Safari, desktop e celular antes de publicar.
+- [x] Condicionar o fallback HTML imediato ao build Cloudflare, sem markup extra no bootstrap interno.
+- [x] Abrir e validar explicitamente o app interno após a separação dos entrypoints, confirmando bootstrap padrão sem fallback extra.
+- [x] Revalidar o shell Cloudflare no preview e no build publicado após a separação de entrypoints.
+- [ ] Validar a nova entrada publicada no Safari com o usuário antes de concluir a correção de tela vazia.
+- [x] Trocar a seleção de entrypoint por detecção direta do host Cloudflare Pages, sem transformação de HTML pelo Vite.
+- [ ] Confirmar no bundle publicado que o Safari executa somente a entrada Cloudflare e não o bootstrap tRPC interno.
+- [x] Reestruturar a tela de canal como uma Command Deck com foco de transmissão, informação operacional e composição sem espaços mortos.
+- [x] Refatorar a navegação, salas e presença em componentes Command Deck com hierarquia e ações prioritárias reais.
+- [x] Implementar telemetria operacional real no layout publicado para canal, presença e voz.
+- [x] Validar visualmente a barra de chamada com uma chamada ativa no desktop e registrar o novo layout operacional.
+- [x] Implementar ou evidenciar um painel de operadores dedicado na Command Deck, substituindo claramente o painel anterior ocultado.
+- [ ] Validar no celular a navegação compacta, o envio de mensagem e a chamada ativa com palco e controles.
+- [x] Reservar uma coluna visual para a telemetria desktop, evitando sobreposição sobre a área de transmissão.
+- [x] Remover contagens artificiais de salas sem participantes e manter indicadores de ocupação somente quando houver presença real.
+- [x] Adicionar teste do componente CommandNavigation para estados ativos e ocupação real de salas de voz.
+- [x] Validar visualmente a direção de arte em desktop e celular, corrigindo composição, contraste e interações antes da publicação.
+- [x] Corrigir a composição do estado vazio no celular para separar radar, telemetria e texto sem sobreposição.

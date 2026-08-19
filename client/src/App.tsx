@@ -9,12 +9,14 @@ import { isCloudflareRuntime } from "./lib/runtime-mode";
 
 const Home = lazy(() => import("./pages/Home"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const CallStagePreview = lazy(() => import("./pages/CallStagePreview"));
 
 function Router() {
   if (isCloudflareRuntime(import.meta.env.VITE_DEPLOY_TARGET, window.location.pathname, window.location.hostname)) return <CloudflareHome />;
   // make sure to consider if you need authentication for certain routes
   return <Suspense fallback={<main className="grid min-h-screen place-items-center bg-[#100d16] text-sm text-violet-100">Carregando VybeChat…</main>}><Switch>
     <Route path={"/"} component={Home} />
+    <Route path={"/callstage-preview"} component={CallStagePreview} />
     <Route path={"/404"} component={NotFound} />
     {/* Final fallback route */}
     <Route component={NotFound} />

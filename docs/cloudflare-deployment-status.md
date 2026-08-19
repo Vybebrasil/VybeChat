@@ -27,3 +27,17 @@ O Cloudflare Pages publicou o frontend com sucesso em `https://vybechat.pages.de
 ## Compatibilidade com Safari
 
 Após um relato de tela branca no Safari, a rota Cloudflare deixou de carregar a página interna e seu renderizador avançado de markdown no bundle inicial. O frontend agora usa carregamento sob demanda para páginas internas, texto nativo para mensagens no painel Cloudflare e alvo de build `safari13`. A correção foi enviada no commit `cdc26e0`; a nova implantação de produção está em processamento e deve ser revalidada no navegador afetado após sua promoção.
+
+## Reconstrução cyberpunk e nova estabilização
+
+O checkpoint `d21cd72` introduziu um bootstrap específico para o shell Cloudflare, eliminando o carregamento de dependências internas de tRPC antes da renderização do painel externo. A interface foi reconstruída como uma central de comando preta e laranja, com identidade `V//`, superfícies técnicas, palco de chamada e central colaborativa alinhados.
+
+Em 19 de agosto de 2026, os arquivos da correção foram sincronizados explicitamente ao repositório GitHub conectado. O Cloudflare Pages reconheceu os commits e colocou as builds na fila. A promoção final e a verificação em Safari permanecem pendentes antes de considerar essa versão validada em produção.
+
+## Bootstrap estático do Safari
+
+O checkpoint `0ad8f532` separou a entrada interna da entrada Cloudflare. O build Cloudflare agora recebe `cloudflare-main.tsx` e um fallback HTML imediato; o app interno continua usando `main.tsx` sem esse markup. Em 19 de agosto de 2026, o Pages reconheceu os commits `Fix Safari static Cloudflare bootstrap` e iniciou a fila de implantação. A confirmação do usuário no Safari ainda é necessária após a promoção da build final.
+
+## Seleção determinística por host
+
+Após o teste no Safari indicar que a transformação de entrada pelo Vite não era aplicada no Pages, a seleção passou a ocorrer diretamente em `main.tsx` e `App.tsx`: qualquer host `*.pages.dev` monta a versão Cloudflare e pula a inicialização tRPC interna. O Pages reconheceu esses commits; a build final permanece em fila e deve ser confirmada no Safari após a promoção.

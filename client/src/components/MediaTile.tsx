@@ -48,24 +48,24 @@ export function MediaTile({
   }, [volume]);
 
   return (
-    <article onClick={onSelect} className={`relative min-h-[170px] overflow-hidden rounded-2xl border bg-[#14101d] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-violet-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-violet-400/80 shadow-[0_0_28px_rgba(139,92,246,.28)]" : "border-white/10"} ${className}`}>
+    <article onClick={onSelect} className={`relative min-h-[170px] overflow-hidden rounded-2xl border bg-[#0b0a08] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-orange-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-orange-400/80 shadow-[0_0_28px_rgba(255,126,18,.26)]" : "border-orange-200/15"} ${className}`}>
       {stream && cameraOn ? (
         <video ref={videoRef} autoPlay playsInline muted={muted} className="absolute inset-0 h-full w-full object-cover" />
       ) : (
-        <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_center,rgba(117,68,212,.24),transparent_58%)]">
-          <span className="grid size-16 place-items-center rounded-full border border-violet-300/30 bg-violet-400/15 text-xl font-bold text-violet-100">{label.slice(0, 1).toUpperCase()}</span>
+        <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_center,rgba(255,125,22,.19),transparent_58%)]">
+          <span className="grid size-16 place-items-center rounded-full border border-orange-300/30 bg-orange-400/10 text-xl font-bold text-orange-100">{label.slice(0, 1).toUpperCase()}</span>
         </div>
       )}
       <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-10">
         <span className="text-sm font-semibold text-white">{label}{isLocal ? " (você)" : ""}</span>
         <span className="flex items-center gap-1.5 text-white/80">
-          {sharingScreen && <MonitorUp className="size-4 text-violet-200" />}
+          {sharingScreen && <MonitorUp className="size-4 text-orange-200" />}
           {!microphoneOn && <MicOff className="size-4" />}
           {!cameraOn && <VideoOff className="size-4" />}
         </span>
       </div>
-      {onVolumeChange && <label className="absolute inset-x-3 bottom-11 flex items-center gap-2 rounded-lg bg-black/55 px-2 py-1.5 text-white/75"><Volume2 className="size-3.5 shrink-0" /><input aria-label={`Volume de ${label}`} type="range" min="0" max="150" value={normalizeParticipantVolume(volume)} onChange={event => onVolumeChange(normalizeParticipantVolume(Number(event.target.value)))} className="h-1 w-full accent-violet-400" /><span className="w-8 text-right font-mono text-[10px]">{normalizeParticipantVolume(volume)}%</span></label>}
-      <div className="absolute left-3 top-3 flex gap-1.5">{sharingScreen && <span className="rounded-full border border-violet-200/30 bg-violet-500/85 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-white">Tela ao vivo</span>}{speaking && <span className="rounded-full border border-emerald-200/25 bg-emerald-400/85 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-950">Falando</span>}</div>
+      {onVolumeChange && <label className="absolute inset-x-3 bottom-11 flex items-center gap-2 rounded-lg bg-black/55 px-2 py-1.5 text-white/75"><Volume2 className="size-3.5 shrink-0" /><input aria-label={`Volume de ${label}`} type="range" min="0" max="150" value={normalizeParticipantVolume(volume)} onChange={event => onVolumeChange(normalizeParticipantVolume(Number(event.target.value)))} className="h-1 w-full accent-orange-400" /><span className="w-8 text-right font-mono text-[10px]">{normalizeParticipantVolume(volume)}%</span></label>}
+      <div className="absolute left-3 top-3 flex gap-1.5">{sharingScreen && <span className="rounded-full border border-orange-200/30 bg-orange-500/90 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-black">Tela ao vivo</span>}{speaking && <span className="rounded-full border border-emerald-200/25 bg-emerald-400/85 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-950">Falando</span>}</div>
     </article>
   );
 }
