@@ -51,7 +51,7 @@ type Props = {
 };
 
 export function CollaborationDrawer(props: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("central"));
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const pins = useMemo(() => props.messages.filter(message => props.pinnedIds.includes(message.id)), [props.messages, props.pinnedIds]);
   const threadCount = useMemo(() => Object.values(props.messages.reduce<Record<string, number>>((counts, message) => {
@@ -62,9 +62,9 @@ export function CollaborationDrawer(props: Props) {
   const threadReplies = useMemo(() => activeThread ? props.messages.filter(message => message.parentId === activeThread.id) : [], [activeThread, props.messages]);
 
   return <>
-    <button onClick={() => setOpen(true)} className="fixed right-3 top-[84px] z-20 flex items-center gap-2 border border-orange-300/30 bg-[#0d0e12]/95 px-3 py-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-orange-100 shadow-xl backdrop-blur md:bottom-4 md:left-4 md:right-auto md:top-auto"><Bell className="size-4 text-orange-400" />Central</button>
-    {open && <section className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-md flex-col border-l border-orange-300/25 bg-[#0b0c10]/98 p-4 shadow-2xl backdrop-blur sm:p-5">
-      <header className="flex items-center justify-between border-b border-orange-300/15 pb-4"><div><p className="cyber-label">Colaboração / núcleo</p><h3 className="mt-1 [font-family:Orbitron] text-lg font-bold tracking-wide text-orange-50">CENTRAL DA EQUIPE</h3></div><button onClick={() => setOpen(false)} className="grid size-9 border border-orange-300/20 text-orange-100"><X className="size-4" /></button></header>
+    <button onClick={() => setOpen(true)} className="modern-central-trigger fixed right-3 top-[84px] z-20 flex items-center gap-2 border border-orange-300/30 bg-[#0d0e12]/95 px-3 py-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-orange-100 shadow-xl backdrop-blur md:bottom-4 md:left-4 md:right-auto md:top-auto"><Bell className="size-4 text-orange-400" />Central</button>
+    {open && <section className="modern-collaboration-drawer fixed inset-y-0 right-0 z-[60] flex w-full max-w-md flex-col border-l border-orange-300/25 bg-[#0b0c10]/98 p-4 shadow-2xl backdrop-blur sm:p-5">
+      <header className="flex items-center justify-between border-b border-orange-300/15 pb-4"><div><p className="cyber-label">Colaboração</p><h3 className="mt-1 font-sans text-lg font-semibold tracking-tight text-orange-50">Central da equipe</h3></div><button onClick={() => setOpen(false)} className="grid size-9 rounded-xl border border-orange-300/20 text-orange-100"><X className="size-4" /></button></header>
       <div className="mt-4 grid grid-cols-2 gap-2"><select value={props.status} onChange={event => props.onStatusChange(event.target.value as "online" | "away" | "offline" | "focus" | "meeting", props.statusMessage)} className="h-10 rounded-none border border-orange-300/20 bg-black/40 px-2 text-xs text-orange-50"><option value="online">Disponível</option><option value="focus">Em foco</option><option value="meeting">Em reunião</option><option value="away">Ausente</option></select><input value={props.statusMessage} onChange={event => props.onStatusChange(props.status as "online" | "away" | "offline" | "focus" | "meeting", event.target.value)} placeholder="Status personalizado" className="h-10 min-w-0 rounded-none border border-orange-300/20 bg-black/40 px-2 text-xs text-orange-50 placeholder:text-stone-600" /></div>
       <div className="mt-3 flex items-center gap-2 border border-orange-300/20 bg-black/30 px-3"><Search className="size-4 text-orange-400" /><input value={props.searchQuery} onChange={event => props.onSearch(event.target.value)} placeholder="Buscar transmissões" className="h-10 min-w-0 flex-1 bg-transparent text-sm text-orange-50 outline-none placeholder:text-stone-600" /></div>
       {props.searchResults.length > 0 && <div className="mt-2 max-h-28 overflow-y-auto border border-orange-300/15 bg-orange-400/[.03] p-2">{props.searchResults.map(message => <p key={message.id} className="mb-1 text-xs text-stone-300"><b className="text-orange-200">{message.authorName}:</b> {message.content}</p>)}</div>}

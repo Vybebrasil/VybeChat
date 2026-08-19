@@ -13,14 +13,14 @@ type Props = {
 export function CommandTelemetryRail({ channelName, onlineCount, voiceCount, messageCount, activeCall, operators }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   return <aside className={`command-telemetry-rail ${collapsed ? "is-collapsed" : ""}`} aria-label="Telemetria operacional">
-    <header><span>TELEMETRIA</span><button onClick={() => setCollapsed(current => !current)} aria-label={collapsed ? "Expandir telemetria" : "Recolher telemetria"}><ChevronRight className="size-3" /></button><i /></header>
+    <header><span>ATIVIDADE</span><button onClick={() => setCollapsed(current => !current)} aria-label={collapsed ? "Expandir atividade" : "Recolher atividade"}><ChevronRight className="size-3" /></button><i /></header>
     {!collapsed && <>
-    <section className="command-telemetry-channel"><Hash className="size-4" /><div><small>CANAL EM FOCO</small><strong>#{channelName}</strong></div></section>
+    <section className="command-telemetry-channel"><Hash className="size-4" /><div><small>CANAL ATUAL</small><strong>#{channelName}</strong></div></section>
     <div className="command-telemetry-stats">
-      <article><small>OPERADORES</small><b>{String(onlineCount).padStart(2, "0")}</b><i className="bg-emerald-400" /></article>
-      <article><small>PACOTES</small><b>{String(messageCount).padStart(2, "0")}</b><i className="bg-orange-400" /></article>
-      <article><small>VOZ</small><b>{String(voiceCount).padStart(2, "0")}</b><i className={activeCall ? "bg-orange-300" : "bg-stone-700"} /></article>
-      <article><small>UPLINK</small><b>99<em>%</em></b><i className="bg-sky-400" /></article>
+      <article><small>PESSOAS</small><b>{onlineCount}</b><i className="bg-emerald-400" /></article>
+      <article><small>MENSAGENS</small><b>{messageCount}</b><i className="bg-orange-400" /></article>
+      <article><small>EM VOZ</small><b>{voiceCount}</b><i className={activeCall ? "bg-orange-300" : "bg-stone-700"} /></article>
+      <article><small>QUALIDADE</small><b>99<em>%</em></b><i className="bg-sky-400" /></article>
     </div>
     <section className="command-telemetry-signal"><div><span><Radio className="size-3.5" />PULSO DE REDE</span><strong>ESTÁVEL</strong></div><p>▁▂▄▅▃▆▂▅▇▄▃▆▂▅▃▁</p><footer><span>VYBE MESH</span><span>12 MS</span></footer></section>
     <section className="command-telemetry-protocol"><ShieldCheck className="size-4" /><div><small>PROTOCOLO ATIVO</small><strong>{activeCall ? "SINC. DE MÍDIA" : "ESCUTA PASSIVA"}</strong></div></section>

@@ -16,7 +16,7 @@ type Props = {
 export function CommandNavigation({ groups, selectedChannelId, voiceRooms, onSelectText, onJoinVoice }: Props) {
   return <nav className="command-navigation" aria-label="Canais e salas de voz">
     {groups.map(group => <section key={group.name} className="command-nav-group">
-      <p>// {group.name}</p>
+      <p>{group.name}</p>
       {group.channels.map(channel => {
         const members = voiceRooms[channel.id] ?? [];
         const active = selectedChannelId === channel.id;

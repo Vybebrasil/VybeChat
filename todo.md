@@ -93,3 +93,10 @@
 - [x] Ajustar escala, espaçamento e comportamento de overflow da Command Deck para Chrome em telas de notebook.
 - [x] Implementar fallback HTML independente do React e diagnóstico de carregamento para Safari antes da montagem da aplicação.
 - [ ] Validar as correções de layout no Chrome e o fallback no Safari antes de publicar.
+- [x] Substituir a estética de terminal por um sistema visual contemporâneo com superfícies suaves, hierarquia ampla e acentos laranja pontuais.
+- [x] Redesenhar navegação, canal, telemetria, mensagens e presença com padrões de produto inspirados em colaboração moderna.
+- [x] Simplificar o estado vazio e os componentes informativos para privilegiar conteúdo, pessoas e próximas ações.
+- [x] Redesenhar a Central da equipe para a linguagem contemporânea, alinhando tipografia, superfícies, botões e estados ao restante do app.
+- [x] Validar visualmente a Central da equipe redesenhada em desktop e celular antes de concluir a modernização completa da colaboração.
+- [x] Construir uma experiência mobile contemporânea, focada em conversa e chamada, sem miniaturizar a interface desktop.
+- [x] Validar visualmente a nova direção em desktop e celular antes da publicação.
