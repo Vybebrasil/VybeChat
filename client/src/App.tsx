@@ -1,23 +1,23 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import { lazy, Suspense } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
 import CloudflareHome from "./pages/CloudflareHome";
+
+const Home = lazy(() => import("./pages/Home"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 function Router() {
   if (import.meta.env.VITE_DEPLOY_TARGET === "cloudflare" || window.location.pathname === "/cloudflare-preview") return <CloudflareHome />;
   // make sure to consider if you need authentication for certain routes
-  return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
-  );
+  return <Suspense fallback={<main className="grid min-h-screen place-items-center bg-[#100d16] text-sm text-violet-100">Carregando VybeChat…</main>}><Switch>
+    <Route path={"/"} component={Home} />
+    <Route path={"/404"} component={NotFound} />
+    {/* Final fallback route */}
+    <Route component={NotFound} />
+  </Switch></Suspense>;
 }
 
 // NOTE: About Theme

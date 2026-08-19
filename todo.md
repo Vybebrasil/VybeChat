@@ -37,13 +37,15 @@
 - [x] Implementar persistência mínima de canais e mensagens no ambiente Cloudflare.
 - [ ] Configurar autenticação externa simples e regras de acesso para o time.
 - [ ] Integrar o Worker/Durable Object ao frontend publicado e validar salas, áudio e compartilhamento de tela.
-- [ ] Preparar a configuração de Cloudflare Pages e publicar após confirmação final.
+- [x] Preparar a configuração de Cloudflare Pages e publicar após confirmação final.
 - [x] Auditar o conteúdo antes do envio ao repositório público e garantir que nenhum segredo ou arquivo de ambiente seja publicado.
 - [ ] Proteger a aplicação publicada com Cloudflare Access e uma lista permitida de e-mails da equipe.
 - [x] Conectar o Worker ao repositório público usando o diretório raiz cloudflare-worker/vybechat-realtime.
 - [x] Confirmar a implantação do Worker e o binding VYBECHAT_ROOM do Durable Object.
 - [x] Verificar se a versão gerada pela build 76dbfda foi promovida como implantação ativa do Worker.
 - [x] Revalidar a rota de saúde e uma conexão WebSocket após confirmar a nova versão ativa.
-- [ ] Criar o projeto Cloudflare Pages com o comando build:cloudflare e a variável VITE_REALTIME_WORKER_URL.
+- [x] Criar o projeto Cloudflare Pages com o comando build:cloudflare e a variável VITE_REALTIME_WORKER_URL.
 - [ ] Restringir o VybeChat com uma política Cloudflare Access baseada nos e-mails autorizados da equipe.
 - [ ] Validar em produção chat, presença, chamada por áudio/vídeo e compartilhamento de tela entre dois participantes.
+- [x] Investigar o erro de renderização que deixa o VybeChat em tela branca no Safari após a publicação no Cloudflare Pages.
+- [ ] Corrigir a incompatibilidade identificada, publicar uma nova versão e validar o carregamento no navegador afetado.

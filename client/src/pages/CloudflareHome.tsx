@@ -4,18 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getCallMedia, getCallMediaErrorMessage } from "@/lib/call-media";
+import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
 import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspace";
 import { getRealtimeSocket } from "@/lib/realtime";
 import type { VoiceRoom } from "@/lib/voice-room-state";
 import { Hash, LogOut, Mic, MicOff, MonitorUp, Phone, SendHorizontal, Users, Video, VideoOff, Volume2 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Streamdown } from "streamdown";
 
 type Profile = { id: string; name: string; email: string };
 type Presence = { userId: string; name: string; status: "online" | "away" | "offline" };
 type ExternalMessage = { id: string; channelId: number; userId: string; authorName: string; content: string; createdAt: string };
 type RemoteStream = { socketId: string; stream: MediaStream };
 type CallPeer = { socketId: string; name: string };
+
+const Streamdown = ({ children }: { children: string }) => (
+  <span className="whitespace-pre-wrap break-words">{normalizeExternalMessage(children)}</span>
+);
 
 const PROFILE_KEY = "vybechat-cloudflare-profile";
 
