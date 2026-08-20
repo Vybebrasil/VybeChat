@@ -33,6 +33,7 @@ function directIndexKey(userId) {
 }
 
 const DECISIONS_KEY = "team:decisions";
+// Deployment marker: workspace access validation is enabled in the current realtime revision.
 
 export default {
   async fetch(request, env) {
