@@ -150,7 +150,19 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+const isCloudflareBuild = process.env.VITE_DEPLOY_TARGET === "cloudflare";
+
+function vitePluginCloudflarePublicEntry(): Plugin {
+  return {
+    name: "vybechat-cloudflare-public-entry",
+    transformIndexHtml(html) {
+      if (!isCloudflareBuild) return html;
+      return html.replace('src="/src/main.tsx"', 'src="/src/cloudflare-main.tsx"');
+    },
+  };
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginCloudflarePublicEntry()];
 
 export default defineConfig({
   plugins,

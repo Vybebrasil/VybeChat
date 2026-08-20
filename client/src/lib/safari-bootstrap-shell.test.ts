@@ -11,7 +11,7 @@ describe("shell público compatível com Safari", () => {
     expect(html).toContain("window.__vybechatBootstrap");
     expect(html).toContain("VYBE-SAFARI-JS");
     expect(html).toContain("safari-diagnostic.html");
-    expect(html).not.toContain("window.setTimeout(dismiss,1600)");
+    expect(html).toContain('src="/src/main.tsx"');
   });
 
   it("oferece uma rota estática sem React para diagnóstico", () => {
@@ -19,5 +19,12 @@ describe("shell público compatível com Safari", () => {
 
     expect(diagnostic).toContain("Esta página não usa React");
     expect(diagnostic).toContain("HTML estático: OK");
+  });
+
+  it("seleciona o documento Cloudflare no build público", () => {
+    const viteConfig = readFileSync(`${clientRoot}/../vite.config.ts`, "utf8");
+
+    expect(viteConfig).toContain("return html.replace('src=\"/src/main.tsx\"', 'src=\"/src/cloudflare-main.tsx\"')");
+    expect(viteConfig).toContain("VITE_DEPLOY_TARGET === \"cloudflare\"");
   });
 });
