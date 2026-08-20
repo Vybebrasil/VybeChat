@@ -14,6 +14,8 @@
       #safari-fallback section { width: min(440px, 100%); border: 1px solid rgba(255, 156, 41, .32); background: rgba(11, 12, 16, .94); padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
       #safari-fallback strong { display: block; color: #ff9b36; font: 700 24px/1.2 system-ui, sans-serif; letter-spacing: .08em; }
       #safari-fallback p { color: #b7a58f; font-size: 14px; line-height: 1.6; }
+      #bootstrap-details { display: none; color: #ffbc76; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+      #safari-fallback a { display: inline-block; color: #ff9b36; font-size: 13px; font-weight: 700; margin-top: 8px; }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,9 +28,9 @@
   </head>
 
   <body>
-    <div id="safari-fallback"><section><strong>VYBECHAT</strong><p id="bootstrap-status">Inicializando a central de comunicação da Vybe.</p></section></div>
+    <div id="safari-fallback"><section><strong>VYBECHAT</strong><p id="bootstrap-status">Preparando a central de comunicação da Vybe.</p><p id="bootstrap-details" aria-live="polite"></p><a href="/safari-diagnostic.html">Abrir diagnóstico de compatibilidade</a></section></div>
     <div id="root"></div>
-    <script>(function(){var fallback=document.getElementById("safari-fallback");var dismiss=function(){if(fallback)fallback.classList.add("is-hidden")};window.addEventListener("vybechat:ready",dismiss);window.addEventListener("DOMContentLoaded",function(){window.setTimeout(dismiss,1600)});window.addEventListener("error",function(){window.setTimeout(dismiss,300)});})();</script>
+    <script>(function(){var fallback=document.getElementById("safari-fallback");var status=document.getElementById("bootstrap-status");var details=document.getElementById("bootstrap-details");var dismiss=function(){if(fallback)fallback.classList.add("is-hidden")};var report=function(message,detail){if(status)status.textContent=message;if(details){details.textContent=detail||"Código: VYBE-SAFARI-BOOT";details.style.display="block"}};window.__vybechatBootstrap={ready:dismiss,fail:report};window.addEventListener("vybechat:ready",dismiss);window.addEventListener("error",function(event){if(event&&event.message)report("Não foi possível iniciar o painel neste navegador.","Código: VYBE-SAFARI-JS · "+event.message)},true);window.addEventListener("unhandledrejection",function(event){var reason=event&&event.reason;report("Não foi possível iniciar o painel neste navegador.","Código: VYBE-SAFARI-PROMISE · "+(reason&&reason.message?reason.message:String(reason||"Erro não identificado")))});window.setTimeout(function(){if(fallback&&!fallback.classList.contains("is-hidden")&&status)status.textContent="Ainda preparando a interface. O diagnóstico continuará visível se houver incompatibilidade."},3200)})();</script>
     <script type="module" src="/src/main.tsx"></script>
     <script
       defer

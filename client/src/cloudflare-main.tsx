@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ReactNode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import CloudflareHome from "./pages/CloudflareHome";
 import "./index.css";
@@ -6,11 +6,36 @@ import "./command-deck.css";
 import "./modern-vybe.css";
 import "./apple-vybe.css";
 
+function reportStartupFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const bootstrap = (window as Window & { __vybechatBootstrap?: { fail?: (title: string, detail: string) => void } }).__vybechatBootstrap;
+  bootstrap?.fail?.("Não foi possível iniciar o painel neste navegador.", `Código: VYBE-SAFARI-REACT · ${message}`);
+}
+
+function confirmStartup() {
+  const bootstrap = (window as Window & { __vybechatBootstrap?: { ready?: () => void } }).__vybechatBootstrap;
+  bootstrap?.ready?.();
+  window.dispatchEvent(new Event("vybechat:ready"));
+}
+
+function PublicMountProbe({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const timer = window.setTimeout(confirmStartup, 120);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return <>{children}</>;
+}
+
 class PublicErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
 
   static getDerivedStateFromError() {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    reportStartupFailure(error);
   }
 
   render() {
@@ -38,9 +63,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <PublicErrorBoundary>
-    <CloudflareHome />
+    <PublicMountProbe>
+      <CloudflareHome />
+    </PublicMountProbe>
   </PublicErrorBoundary>,
 );
-
-document.getElementById("safari-fallback")?.remove();
-window.dispatchEvent(new Event("vybechat:ready"));

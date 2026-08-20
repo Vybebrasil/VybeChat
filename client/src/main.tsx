@@ -8,17 +8,9 @@ const isCloudflarePages = isCloudflareRuntime(
 );
 
 const showPublicStartupError = () => {
-  document.getElementById("safari-fallback")?.remove();
-  if (!root) return;
-  root.innerHTML = `
-    <main class="public-shell-error" role="alert">
-      <section>
-        <p class="eyebrow">VYBECHAT</p>
-        <h1>Não foi possível iniciar o painel.</h1>
-        <p>Atualize a página. Se o problema continuar, avise a equipe com este horário.</p>
-        <button type="button" onclick="window.location.reload()">Atualizar página</button>
-      </section>
-    </main>`;
+  const bootstrap = (window as Window & { __vybechatBootstrap?: { fail?: (title: string, detail: string) => void } }).__vybechatBootstrap;
+  bootstrap?.fail?.("Não foi possível carregar o painel público.", "Código: VYBE-SAFARI-MODULE · O módulo inicial não foi avaliado.");
+  if (root) root.setAttribute("data-vybechat-startup", "failed");
 };
 
 if (isCloudflarePages) {
