@@ -116,6 +116,31 @@ describe("VybeChatRoom collaboration integration", () => {
     expect(outro.deserializeAttachment().role).toBe("member");
   });
 
+  it("informa o proprio socketId no presence:join", async () => {
+    const { room, sockets } = setup();
+    const novo = new FakeSocket({ socketId: "socket-do-paulo", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
+    sockets.push(novo);
+    await room.handleEvent(novo, "presence:join", { userId: "paulo-1", name: "Paulo", workspaceCode: WORKSPACE_CODE });
+    // O cliente usa esse id para decidir quem cede numa colisao de ofertas.
+    expect(packets(novo)[0]).toEqual({ type: "session:ready", payload: { socketId: "socket-do-paulo" } });
+  });
+
+  it("eventos de chamada so vao para quem esta na mesma sala de voz", async () => {
+    const { room, sockets, admin, member } = setup();
+    admin.attachment.callChannelId = 5;
+    member.attachment.callChannelId = 6;
+    const entrando = new FakeSocket({ socketId: "entrando", userId: "novo@vybe.com", name: "Novo", status: "online", role: "member", callChannelId: null });
+    sockets.push(entrando);
+
+    await room.handleEvent(entrando, "call:join", { channelId: 5 });
+
+    const naSala5 = packets(admin).filter(packet => packet.type === "call:peer-joined");
+    const naSala6 = packets(member).filter(packet => packet.type === "call:peer-joined");
+    expect(naSala5).toHaveLength(1);
+    // Antes o broadcast ia para todo mundo e o cliente descartava.
+    expect(naSala6).toHaveLength(0);
+  });
+
   it("persists direct messages, emits them to the recipient and clears the local unread counter", async () => {
     const { room, storage, admin, member } = setup();
     await room.handleEvent(admin, "direct:new", { toUserId: "member@vybe.com", toName: "Member", content: "Pode revisar a entrega?" });

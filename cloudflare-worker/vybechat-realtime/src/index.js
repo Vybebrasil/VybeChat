@@ -121,6 +121,18 @@ export class VybeChatRoom {
     for (const socket of this.sockets()) if (socket !== except) socket.send(message);
   }
 
+  // Eventos de chamada so interessam a quem esta na mesma sala de voz. Antes iam
+  // para todo mundo e o cliente descartava; com a equipe inteira online isso e
+  // trafego inutil multiplicado por participante.
+  broadcastToCall(channelId, type, payload, except) {
+    const message = json(type, payload);
+    for (const socket of this.sockets()) {
+      if (socket === except) continue;
+      if (this.getState(socket)?.callChannelId !== channelId) continue;
+      socket.send(message);
+    }
+  }
+
   users() {
     const byUser = new Map();
     for (const socket of this.sockets()) {
@@ -157,7 +169,7 @@ export class VybeChatRoom {
     if (!state?.callChannelId) return;
     const channelId = state.callChannelId;
     this.setState(socket, { callChannelId: null, isSpeaking: false });
-    this.broadcast("call:peer-left", { channelId, socketId: state.socketId }, socket);
+    this.broadcastToCall(channelId, "call:peer-left", { channelId, socketId: state.socketId }, socket);
     this.broadcast("voice:rooms", this.voiceRooms());
   }
 
@@ -214,6 +226,9 @@ export class VybeChatRoom {
       }
       const storedRole = await this.ctx.storage.get(`role:${userId}`);
       this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: normalizeRole(storedRole ?? roleForUser(userId, this.env)) });
+      // O cliente precisa do proprio socketId para resolver colisao de ofertas
+      // na chamada sem trocar mensagem extra entre os pares.
+      socket.send(json("session:ready", { socketId: state.socketId }));
       socket.send(json("voice:rooms", this.voiceRooms()));
       this.broadcastPresence();
       return;
@@ -398,7 +413,7 @@ export class VybeChatRoom {
       this.leaveCall(socket);
       const next = this.setState(socket, { callChannelId: payload.channelId, isMuted: false, isSpeaking: false, handRaised: false });
       socket.send(json("call:peers", { channelId: payload.channelId, peers: this.peers(payload.channelId, next.socketId) }));
-      this.broadcast("call:peer-joined", { channelId: payload.channelId, peer: { socketId: next.socketId, userId: next.userId, name: next.name, status: next.status, isMuted: false, isSpeaking: false } }, socket);
+      this.broadcastToCall(payload.channelId, "call:peer-joined", { channelId: payload.channelId, peer: { socketId: next.socketId, userId: next.userId, name: next.name, status: next.status, isMuted: false, isSpeaking: false } }, socket);
       this.broadcast("voice:rooms", this.voiceRooms());
       return;
     }
@@ -415,7 +430,7 @@ export class VybeChatRoom {
       return;
     }
     if (type === "call:screen-share" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
-      this.broadcast("call:screen-share", { channelId: payload.channelId, socketId: payload.active ? state.socketId : null, name: payload.active ? state.name : null });
+      this.broadcastToCall(payload.channelId, "call:screen-share", { channelId: payload.channelId, socketId: payload.active ? state.socketId : null, name: payload.active ? state.name : null });
       return;
     }
     if (["call:offer", "call:answer", "call:ice"].includes(type) && validChannelId(payload.channelId) && typeof payload.to === "string") {

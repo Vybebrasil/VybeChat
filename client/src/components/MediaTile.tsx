@@ -1,10 +1,11 @@
 import { MicOff, MonitorUp, VideoOff, Volume2 } from "lucide-react";
 import React, { useEffect, useRef } from "react";
-import { normalizeParticipantVolume, toMediaElementVolume } from "@/lib/participant-volume";
+import { normalizeParticipantVolume } from "@/lib/participant-volume";
 
 type MediaTileProps = {
   stream: MediaStream | null;
   label: string;
+  /** Mantido para compatibilidade: o audio remoto agora sai pelo CallAudioSink. */
   muted?: boolean;
   isLocal?: boolean;
   cameraOn?: boolean;
@@ -22,7 +23,6 @@ type MediaTileProps = {
 export function MediaTile({
   stream,
   label,
-  muted = false,
   isLocal = false,
   cameraOn = true,
   microphoneOn = true,
@@ -36,37 +36,16 @@ export function MediaTile({
   onSelect,
 }: MediaTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
     videoRef.current.srcObject = stream;
   }, [stream]);
 
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.srcObject = stream;
-    if (!isLocal && stream) {
-      const playback = audioRef.current.play();
-      if (playback && typeof playback.catch === "function") void playback.catch(() => undefined);
-    }
-  }, [isLocal, stream]);
-
-  useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.volume = toMediaElementVolume(volume);
-  }, [volume]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.volume = toMediaElementVolume(volume);
-  }, [volume]);
-
   return (
     <article onClick={onSelect} className={`relative min-h-[170px] overflow-hidden rounded-2xl border bg-[#0b0a08] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-orange-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-orange-400/80 shadow-[0_0_28px_rgba(255,126,18,.26)]" : "border-orange-200/15"} ${className}`}>
-      {stream && !isLocal && <audio ref={audioRef} autoPlay playsInline />}
       {stream && cameraOn ? (
-        <video ref={videoRef} autoPlay playsInline muted={muted} className="absolute inset-0 h-full w-full object-cover" />
+        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_center,rgba(255,125,22,.19),transparent_58%)]">
           <span className="grid size-16 place-items-center rounded-full border border-orange-300/30 bg-orange-400/10 text-xl font-bold text-orange-100">{label.slice(0, 1).toUpperCase()}</span>
