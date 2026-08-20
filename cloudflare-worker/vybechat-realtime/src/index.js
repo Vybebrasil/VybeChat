@@ -6,15 +6,31 @@ function json(type, payload) {
   return JSON.stringify({ type, payload });
 }
 
+const CHANNEL_ID_SET = new Set(CHANNEL_IDS);
+
+// Antes qualquer id ate 99 era gravavel, mas a busca so varria CHANNEL_IDS:
+// dava para escrever em canais fantasma que a interface nunca mostra.
 function validChannelId(value) {
-  return Number.isInteger(value) && value > 0 && value <= 99;
+  return Number.isInteger(value) && CHANNEL_ID_SET.has(value);
 }
 
 function validStatus(value) {
   return ["online", "away", "offline", "focus", "meeting"].includes(value);
 }
 
-function roleForUser(userId) { return userId === "gestaovybe@gmail.com" ? "admin" : "member"; }
+function adminSlugs(env) {
+  return String(env?.VYBECHAT_ADMIN_SLUGS ?? "")
+    .split(",")
+    .map(slug => slug.trim().toLocaleLowerCase())
+    .filter(Boolean);
+}
+
+// O cliente monta o userId como `${slug-do-nome}-${timestamp}-${aleatorio}`.
+// Comparar o id inteiro nunca casa, entao conferimos apenas o prefixo do slug.
+function roleForUser(userId, env) {
+  const id = String(userId ?? "").toLocaleLowerCase();
+  return adminSlugs(env).some(slug => id === slug || id.startsWith(`${slug}-`)) ? "admin" : "member";
+}
 
 function messageKey(channelId) {
   return `messages:${channelId}`;
@@ -33,6 +49,16 @@ function directIndexKey(userId) {
 }
 
 const DECISIONS_KEY = "team:decisions";
+
+// Comparacao de tempo constante: evita descobrir o codigo medindo o tempo de resposta.
+function timingSafeEqual(candidate, expected) {
+  const a = String(candidate);
+  const b = String(expected);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let index = 0; index < a.length; index += 1) diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return diff === 0;
+}
 // Deployment marker: workspace access validation is enabled in the current realtime revision.
 
 export default {
@@ -163,15 +189,31 @@ export class VybeChatRoom {
     const state = this.getState(socket);
     if (!state) return;
 
+    // Portao de autenticacao. Antes de um presence:join valido a conexao nao le
+    // nem escreve nada: sem historico, sem presenca, sem sinalizacao de chamada.
+    if (type !== "presence:join" && !state.userId) {
+      socket.send(json("realtime:error", { code: "auth", message: "Sessao nao autenticada. Entre novamente no VybeChat." }));
+      return;
+    }
+
     if (type === "presence:join") {
-      const userId = String(payload.userId ?? "");
+      const userId = String(payload.userId ?? "").slice(0, 120);
       const workspaceCode = this.env?.VYBECHAT_WORKSPACE_CODE;
-      if (workspaceCode && payload.workspaceCode !== workspaceCode) {
-        socket.send(json("realtime:error", { message: "O código de acesso da equipe não foi aceito." }));
+      // Fail-closed: sem o secret configurado ninguem entra, em vez de liberar a sala inteira.
+      if (!workspaceCode) {
+        socket.send(json("realtime:error", { code: "auth", message: "O VybeChat ainda nao foi liberado. Configure o codigo de acesso da equipe no Worker." }));
+        return;
+      }
+      if (!timingSafeEqual(String(payload.workspaceCode ?? ""), workspaceCode)) {
+        socket.send(json("realtime:error", { code: "auth", message: "O código de acesso da equipe não foi aceito." }));
+        return;
+      }
+      if (!userId) {
+        socket.send(json("realtime:error", { code: "auth", message: "Nao foi possivel identificar o seu perfil. Entre novamente." }));
         return;
       }
       const storedRole = await this.ctx.storage.get(`role:${userId}`);
-      this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: userId === "gestaovybe@gmail.com" ? "admin" : normalizeRole(storedRole ?? roleForUser(userId)) });
+      this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: normalizeRole(storedRole ?? roleForUser(userId, this.env)) });
       socket.send(json("voice:rooms", this.voiceRooms()));
       this.broadcastPresence();
       return;
