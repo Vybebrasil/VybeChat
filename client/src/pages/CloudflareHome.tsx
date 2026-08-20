@@ -18,6 +18,10 @@ import { getCallMedia, getCallMediaErrorMessage, type CallDeviceSelection } from
 import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
 import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspace";
 import { drainIceCandidates, queueIceCandidate, type PendingIceCandidates } from "@/lib/ice-candidates";
+import { CallAudioSink } from "@/components/CallAudioSink";
+import { createSpeakingDetector } from "@/lib/speaking-detector";
+import { getIceServers } from "@/lib/ice-config";
+import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { summarizePeerAudioStats, type PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 import { getRealtimeSocket } from "@/lib/realtime";
@@ -75,6 +79,9 @@ export default function CloudflareHome() {
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
   const [callPeers, setCallPeers] = useState<Record<string, CallPeer>>({});
   const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>({});
+  // O navegador pode recusar o autoplay do audio. Antes o erro era engolido e a
+  // pessoa simplesmente nao ouvia ninguem, sem nenhuma pista do motivo.
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const [microphoneOn, setMicrophoneOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -108,6 +115,19 @@ export default function CloudflareHome() {
   const activeCallRef = useRef<number | null>(null);
   const peerConnectionsRef = useRef(new Map<string, RTCPeerConnection>());
   const pendingIceCandidatesRef = useRef<PendingIceCandidates>(new Map());
+  // O worker informa nosso socketId no presence:join. Ele decide quem cede numa
+  // colisao de ofertas, sem precisar de mensagem extra entre os pares.
+  const localSocketIdRef = useRef("");
+  const negotiationRef = useRef(new Map<string, NegotiationState>());
+  const restartTimersRef = useRef(new Map<string, number>());
+  const iceServersRef = useRef<RTCIceServer[]>(getIceServers());
+  // Lido dentro do efeito de sockets sem entrar nas dependencias: antes trocar de
+  // canal de texto durante a chamada re-registrava todos os handlers.
+  const selectedChannelIdRef = useRef(selectedChannelId);
+  const microphoneOnRef = useRef(true);
+
+  useEffect(() => { selectedChannelIdRef.current = selectedChannelId; }, [selectedChannelId]);
+  useEffect(() => { microphoneOnRef.current = microphoneOn; }, [microphoneOn]);
 
   const selectedChannel = useMemo(() => findExternalChannel(selectedChannelId), [selectedChannelId]);
   const isContextPreview = window.location.pathname === "/cloudflare-preview" && new URLSearchParams(window.location.search).get("demo") === "1" && new URLSearchParams(window.location.search).get("call") === "1";
@@ -133,11 +153,38 @@ export default function CloudflareHome() {
     }
   };
 
+  const clearRestartTimer = (peerId: string) => {
+    const timer = restartTimersRef.current.get(peerId);
+    if (timer !== undefined) {
+      window.clearTimeout(timer);
+      restartTimersRef.current.delete(peerId);
+    }
+  };
+
+  const restartIce = async (peerId: string, connection: RTCPeerConnection) => {
+    if (!activeCallRef.current) return;
+    const negotiation = negotiationRef.current.get(peerId);
+    if (!negotiation || negotiation.makingOffer || connection.signalingState !== "stable") return;
+    try {
+      negotiation.makingOffer = true;
+      const offer = await connection.createOffer({ iceRestart: true });
+      if (connection.signalingState !== "stable") return;
+      await connection.setLocalDescription(offer);
+      socketRef.current.emit("call:offer", { to: peerId, channelId: activeCallRef.current, offer });
+    } catch (error) {
+      console.warn("[VybeChat] reinicio de ICE falhou", { peerId, error });
+      setNotice("A conexão com um participante caiu. Tente sair e entrar novamente na sala.");
+    } finally {
+      negotiation.makingOffer = false;
+    }
+  };
+
   const createPeer = async (peerId: string, shouldOffer = false) => {
     const existing = peerConnectionsRef.current.get(peerId);
     if (existing) return existing;
-    const connection = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    const connection = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peerConnectionsRef.current.set(peerId, connection);
+    negotiationRef.current.set(peerId, { makingOffer: false, ignoreOffer: false });
     localStreamRef.current?.getTracks().forEach(track => connection.addTrack(track, localStreamRef.current!));
     connection.onicecandidate = event => {
       if (event.candidate && activeCallRef.current) socketRef.current.emit("call:ice", { to: peerId, channelId: activeCallRef.current, candidate: event.candidate });
@@ -151,21 +198,38 @@ export default function CloudflareHome() {
       });
     };
     connection.onconnectionstatechange = () => {
-      if (connection.connectionState !== "failed" || !activeCallRef.current) return;
-      void (async () => {
-        try {
-          const offer = await connection.createOffer({ iceRestart: true });
-          await connection.setLocalDescription(offer);
-          socketRef.current.emit("call:offer", { to: peerId, channelId: activeCallRef.current, offer });
-        } catch {
-          setNotice("A conexão com um participante caiu. Tente sair e entrar novamente na sala.");
-        }
-      })();
+      const state = connection.connectionState;
+      if (state === "connected" || state === "closed") {
+        clearRestartTimer(peerId);
+        return;
+      }
+      // `failed` nao volta sozinho: reinicia na hora. `disconnected` costuma se
+      // resolver em poucos segundos, entao damos uma janela antes de mexer.
+      if (shouldRestartIce(state)) {
+        clearRestartTimer(peerId);
+        void restartIce(peerId, connection);
+        return;
+      }
+      if (shouldScheduleRestart(state) && !restartTimersRef.current.has(peerId)) {
+        const timer = window.setTimeout(() => {
+          restartTimersRef.current.delete(peerId);
+          if (connection.connectionState === "disconnected") void restartIce(peerId, connection);
+        }, DISCONNECTED_GRACE_MS);
+        restartTimersRef.current.set(peerId, timer);
+      }
     };
     if (shouldOffer && activeCallRef.current) {
-      const offer = await connection.createOffer();
-      await connection.setLocalDescription(offer);
-      socketRef.current.emit("call:offer", { to: peerId, channelId: activeCallRef.current, offer });
+      const negotiation = negotiationRef.current.get(peerId)!;
+      try {
+        negotiation.makingOffer = true;
+        const offer = await connection.createOffer();
+        await connection.setLocalDescription(offer);
+        socketRef.current.emit("call:offer", { to: peerId, channelId: activeCallRef.current, offer });
+      } catch (error) {
+        console.warn("[VybeChat] oferta inicial falhou", { peerId, error });
+      } finally {
+        negotiation.makingOffer = false;
+      }
     }
     return connection;
   };
@@ -175,7 +239,7 @@ export default function CloudflareHome() {
     const socket = socketRef.current;
     const announce = () => {
       socket.emit("presence:join", { userId: profile.id, name: profile.name, status, statusMessage, workspaceCode });
-      socket.emit("channel:join", { channelId: selectedChannelId });
+      socket.emit("channel:join", { channelId: selectedChannelIdRef.current });
       socket.emit("direct:list", {});
       socket.emit("decision:list", {});
     };
@@ -208,9 +272,10 @@ export default function CloudflareHome() {
     socket.on("direct:read", ({ thread }: { thread: DirectThread }) => setDirectThreads(current => current.map(item => item.id === thread.id ? thread : item)));
     socket.on("decision:list", ({ decisions: nextDecisions }: { decisions: TeamDecision[] }) => setDecisions(nextDecisions));
     socket.on("typing", ({ channelId, name: typingName, active }: { channelId: number; name: string; active: boolean }) => {
-      if (channelId !== selectedChannelId || typingName === profile.name) return;
+      if (channelId !== selectedChannelIdRef.current || typingName === profile.name) return;
       setTypingNames(current => active ? Array.from(new Set([...current, typingName])) : current.filter(item => item !== typingName));
     });
+    socket.on("session:ready", ({ socketId }: { socketId: string }) => { localSocketIdRef.current = socketId; });
     socket.on("call:invite", ({ channelId, from }: { channelId: number; from: { name: string } }) => setNotice(`${from.name} convidou você para ${findExternalChannel(channelId)?.name ?? "uma sala"}.`));
     socket.on("call:peers", async ({ channelId, peers }: { channelId: number; peers: CallPeer[] }) => {
       if (channelId !== activeCallRef.current) return;
@@ -224,18 +289,44 @@ export default function CloudflareHome() {
       if (channelId !== activeCallRef.current) return;
       if (user) setCallPeers(current => ({ ...current, [from]: { socketId: from, name: user.name } }));
       const peer = await createPeer(from);
-      await peer.setRemoteDescription(new RTCSessionDescription(offer));
-      await flushPendingIceCandidates(from, peer);
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      socket.emit("call:answer", { to: from, channelId, answer });
+      const negotiation = negotiationRef.current.get(from) ?? { makingOffer: false, ignoreOffer: false };
+      const polite = isPolitePeer(localSocketIdRef.current, from);
+      // Colisao: os dois lados ofertaram ao mesmo tempo (tipico no reinicio de
+      // ICE). O lado educado desfaz a propria oferta e aceita a do outro; o
+      // impaciente descarta a que chegou. Sem isso um dos pares ficava mudo.
+      negotiation.ignoreOffer = shouldIgnoreOffer({ polite, makingOffer: negotiation.makingOffer, signalingState: peer.signalingState });
+      negotiationRef.current.set(from, negotiation);
+      if (negotiation.ignoreOffer) return;
+      try {
+        if (polite && peer.signalingState !== "stable") {
+          await Promise.all([
+            peer.setLocalDescription({ type: "rollback" } as RTCLocalSessionDescriptionInit),
+            peer.setRemoteDescription(new RTCSessionDescription(offer)),
+          ]);
+        } else {
+          await peer.setRemoteDescription(new RTCSessionDescription(offer));
+        }
+        await flushPendingIceCandidates(from, peer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit("call:answer", { to: from, channelId, answer });
+      } catch (error) {
+        console.warn("[VybeChat] oferta recusada", { peerId: from, error });
+      }
     });
     socket.on("call:answer", async ({ from, channelId, answer }: { from: string; channelId: number; answer: RTCSessionDescriptionInit }) => {
       if (channelId !== activeCallRef.current) return;
       const peer = peerConnectionsRef.current.get(from);
       if (!peer) return;
-      await peer.setRemoteDescription(new RTCSessionDescription(answer));
-      await flushPendingIceCandidates(from, peer);
+      try {
+        // Uma resposta que chega depois de a conexao voltar a "stable" ja nao
+        // pertence a negociacao atual; aplicar mata a conexao com excecao.
+        if (peer.signalingState !== "have-local-offer") return;
+        await peer.setRemoteDescription(new RTCSessionDescription(answer));
+        await flushPendingIceCandidates(from, peer);
+      } catch (error) {
+        console.warn("[VybeChat] resposta recusada", { peerId: from, error });
+      }
     });
     socket.on("call:ice", async ({ from, channelId, candidate }: { from: string; channelId: number; candidate: RTCIceCandidateInit }) => {
       if (channelId !== activeCallRef.current) return;
@@ -254,6 +345,8 @@ export default function CloudflareHome() {
       peerConnectionsRef.current.get(socketId)?.close();
       peerConnectionsRef.current.delete(socketId);
       pendingIceCandidatesRef.current.delete(socketId);
+      negotiationRef.current.delete(socketId);
+      clearRestartTimer(socketId);
       setRemoteStreams(current => current.filter(item => item.socketId !== socketId));
       setCallPeers(current => {
         const next = { ...current };
@@ -282,9 +375,9 @@ export default function CloudflareHome() {
     socket.connect();
     if (socket.connected) announce();
     return () => {
-      ["connect", "presence:update", "voice:rooms", "message:history", "message:new", "message:update", "message:pins", "message:search-results", "channel:permissions", "direct:list", "direct:history", "direct:new", "direct:read", "decision:list", "typing", "call:invite", "call:peers", "call:peer-joined", "call:offer", "call:answer", "call:ice", "call:peer-left", "call:screen-share", "realtime:error"].forEach(event => socket.off(event));
+      ["connect", "session:ready", "presence:update", "voice:rooms", "message:history", "message:new", "message:update", "message:pins", "message:search-results", "channel:permissions", "direct:list", "direct:history", "direct:new", "direct:read", "decision:list", "typing", "call:invite", "call:peers", "call:peer-joined", "call:offer", "call:answer", "call:ice", "call:peer-left", "call:screen-share", "realtime:error"].forEach(event => socket.off(event));
     };
-  }, [activeDirectThreadId, notify, profile, selectedChannelId, status, statusMessage]);
+  }, [activeDirectThreadId, notify, profile, status, statusMessage]);
 
   useEffect(() => {
     if (profile && socketRef.current.connected) socketRef.current.emit("channel:join", { channelId: selectedChannelId });
@@ -294,6 +387,19 @@ export default function CloudflareHome() {
     if (!profile || !navigator.mediaDevices?.enumerateDevices) return;
     void listAudioInputs(navigator.mediaDevices).then(setAudioInputs).catch(() => setAudioInputs([]));
   }, [profile]);
+
+  useEffect(() => {
+    // Sem isso o indicador "Falando" so acendia com push-to-talk ligado.
+    if (!localStream || !activeCallChannelId || pushToTalkEnabled) return;
+    const stop = createSpeakingDetector({
+      stream: localStream,
+      onChange: speaking => {
+        if (!activeCallRef.current) return;
+        socketRef.current.emit("call:audio-state", { channelId: activeCallRef.current, isMuted: !microphoneOnRef.current, isSpeaking: speaking && microphoneOnRef.current });
+      },
+    });
+    return () => { stop?.(); };
+  }, [activeCallChannelId, localStream, pushToTalkEnabled]);
 
   useEffect(() => {
     if (!pushToTalkEnabled || !activeCallChannelId) return;
@@ -351,7 +457,9 @@ export default function CloudflareHome() {
     const remote = remoteStreams.map(remoteStream => {
       const member = activeRoomMembers.find(candidate => candidate.socketId === remoteStream.socketId);
       const label = member?.name || callPeers[remoteStream.socketId]?.name || "Participante";
-      const hasVideo = remoteStream.stream.getVideoTracks().some(track => track.readyState === "live" && track.enabled);
+      // `muted` cobre o replaceTrack(null) de quem parou de compartilhar sem camera:
+      // o track continua "live" e o tile ficava congelado no ultimo quadro.
+      const hasVideo = remoteStream.stream.getVideoTracks().some(track => track.readyState === "live" && track.enabled && !track.muted);
       return {
         id: remoteStream.socketId,
         stream: remoteStream.stream,
@@ -463,7 +571,11 @@ export default function CloudflareHome() {
       setActiveCallChannelId(channelId);
       setSelectedChannelId(channelId);
       setMicrophoneOn(true);
-      setCameraOn(mode === "camera-and-audio");
+      // Entrar numa sala nao deve colocar sua camera no ar sem voce pedir. O
+      // track e capturado, mas fica desligado ate clicarem em "Ligar camera" —
+      // assim nao ha renegociacao depois, e portanto nenhuma colisao de oferta.
+      stream.getVideoTracks().forEach(track => { track.enabled = false; });
+      setCameraOn(false);
       setSelectedAudioInput(selection.audioInputId ?? "");
       setHandRaised(false);
       setNotice(mode === "audio-only" ? "Você entrou somente por áudio." : null);
@@ -487,6 +599,11 @@ export default function CloudflareHome() {
     if (activeCallRef.current) socketRef.current.emit("call:audio-state", { channelId: activeCallRef.current, isMuted: !next, isSpeaking: false });
   };
 
+  const unblockAudio = () => {
+    document.querySelectorAll<HTMLAudioElement>("audio").forEach(element => { void element.play().catch(() => undefined); });
+    setAudioBlocked(false);
+  };
+
   const toggleHandRaise = () => {
     if (!activeCallRef.current) return;
     const next = !handRaised;
@@ -508,7 +625,7 @@ export default function CloudflareHome() {
       const { track } = await getSelectedAudioTrack(navigator.mediaDevices, deviceId);
       track.enabled = microphoneOn;
       const previousTrack = localStreamRef.current.getAudioTracks()[0];
-      localStreamRef.current.removeTrack(previousTrack);
+      if (previousTrack) localStreamRef.current.removeTrack(previousTrack);
       localStreamRef.current.addTrack(track);
       previousTrack?.stop();
       await Promise.all(Array.from(peerConnectionsRef.current.values()).map(peer => peer.getSenders().find(sender => sender.track?.kind === "audio")?.replaceTrack(track)));
@@ -531,7 +648,7 @@ export default function CloudflareHome() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       const track = stream.getVideoTracks()[0];
       for (const [peerId, peer] of Array.from(peerConnectionsRef.current.entries())) {
         const sender = peer.getSenders().find(item => item.track?.kind === "video");
@@ -573,5 +690,5 @@ export default function CloudflareHome() {
   return <main className="cyber-grid flex min-h-screen p-0 text-foreground md:p-3"><CallPreflightDialog open={preflightChannelId !== null} roomName={findExternalChannel(preflightChannelId ?? 0)?.name ?? "sala"} onOpenChange={open => { if (!open) setPreflightChannelId(null); }} onJoin={selection => { const channelId = preflightChannelId; setPreflightChannelId(null); if (channelId !== null) void joinVoice(channelId, selection); }} /><DirectMessagesDrawer open={directOpen} profileId={profile.id} threads={directThreads} messages={directMessages} presence={presence} activeThreadId={activeDirectThreadId} onOpenChange={setDirectOpen} onOpenThread={openDirectMessage} onSend={sendDirectMessage} /><VybeCommandPalette channels={EXTERNAL_WORKSPACE.flatMap(category => category.channels)} members={presence.filter(member => member.userId !== profile.id)} onSelectChannel={selectChannel} onJoinVoice={prepareVoice} onOpenDirect={openDirectMessage} onOpenCentral={() => document.querySelector<HTMLButtonElement>(".modern-central-trigger")?.click()} /><NotificationControl preferences={notificationPreferences} onRequestPermission={() => { void requestPermission(); }} onToggleQuiet={toggleQuiet} /><DecisionsDrawer decisions={decisions} profileName={profile.name} onCreate={createDecision} onUpdate={updateDecision} /><section className="cyber-panel flex min-w-0 flex-1 min-h-screen overflow-hidden bg-[#0b0c10]/92 md:min-h-[calc(100vh-1.5rem)]">{mobileSidebarOpen && <button onClick={() => setMobileSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/75 md:hidden" aria-label="Fechar navegação" />}{sidebar}
     <section className="flex min-w-0 flex-1 flex-col"><header className="flex h-[64px] items-center gap-3 border-b border-orange-300/15 bg-black/20 px-4 sm:h-[76px] sm:px-6"><button onClick={() => setMobileSidebarOpen(true)} className="grid size-9 rounded-lg border border-orange-300/20 text-orange-200 md:hidden" aria-label="Abrir canais"><Menu className="size-4" /></button><div className="grid size-10 place-items-center rounded-xl border border-orange-300/25 bg-orange-400/10 text-orange-300"><Hash className="size-5" /></div><div className="min-w-0"><p className="cyber-label">Canal</p><h1 className="truncate font-sans text-sm font-semibold text-orange-50">{selectedChannel?.name}</h1></div>{activeCallChannelId && <button onClick={() => setCallStageOpen(true)} className="ml-auto rounded-xl border border-orange-300/35 bg-orange-400/10 px-3 py-2 text-xs font-semibold text-orange-100">Abrir chamada</button>}<span className={`${activeCallChannelId ? "hidden sm:flex" : "ml-auto flex"} items-center gap-2 rounded-full border border-orange-300/20 bg-orange-400/5 px-3 py-2 text-xs text-orange-200`}><span className="signal-pulse size-1.5 rounded-full bg-emerald-400" />{presence.length} online</span></header>
       <div className="flex min-h-0 flex-1"><section className="flex min-w-0 flex-1 flex-col"><div className="flex-1 overflow-y-auto p-4 sm:p-7"><div className="mx-auto max-w-4xl"><div className="mb-7 border-b border-orange-300/12 pb-7"><div className="grid size-14 place-items-center rounded-2xl border border-orange-300/25 bg-orange-400/10 text-orange-300"><Hash className="size-7" /></div><p className="cyber-label mt-5">Canal da equipe</p><h2 className="mt-1 font-sans text-3xl font-semibold tracking-tight text-orange-50">#{selectedChannel?.name}</h2><p className="mt-2 text-sm text-stone-400">Converse, compartilhe decisões e mantenha todo mundo no mesmo contexto.</p></div><div className="space-y-4">{channelMessages.length ? channelMessages.map(message => <article key={message.id} className="cyber-corner flex gap-3 border border-orange-300/10 bg-black/15 p-3"><Avatar className="size-9"><AvatarFallback className="rounded-xl border border-orange-300/20 bg-orange-400/10 text-xs text-orange-100">{initials(message.authorName)}</AvatarFallback></Avatar><div className="min-w-0"><p className="text-xs font-semibold text-orange-100">{message.authorName}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-stone-300">{normalizeExternalMessage(message.content)}</p></div></article>) : <div className="cyber-corner relative overflow-hidden border border-orange-300/15 bg-black/20 p-6 sm:p-8"><div className="absolute right-5 top-4 text-5xl font-bold text-orange-400/10">V</div><p className="cyber-label">Ainda não há mensagens</p><p className="mt-3 max-w-sm text-sm leading-6 text-stone-400">Comece a conversa e mantenha a equipe alinhada neste canal.</p><div className="mt-6 flex gap-2 text-xs text-stone-400"><span>Canal privado</span><span>•</span><span>Atualizações em tempo real</span></div></div>}</div>{typingNames.length > 0 && <p className="mt-4 text-xs text-orange-300">{typingNames.join(", ")} digitando…</p>}{notice && <p className="mt-5 rounded-xl border-l-2 border-orange-400 bg-orange-400/8 p-3 text-xs text-orange-100">{notice}</p>}</div></div>{selectedChannel && (selectedChannel.type === "text" || activeCallChannelId === selectedChannelId) && <form onSubmit={sendMessage} className="mx-auto flex w-full max-w-4xl gap-2 px-4 pb-4 sm:px-7 sm:pb-6"><div className="min-w-0 flex-1">{threadParent && <p className="mb-1 truncate text-xs text-orange-300">Respondendo a {threadParent.authorName} · <button type="button" onClick={() => setThreadParent(null)} className="underline">cancelar</button></p>}<Textarea value={draft} onChange={event => { setDraft(event.target.value); socketRef.current.emit("typing", { channelId: selectedChannelId, active: Boolean(event.target.value.trim()) }); }} placeholder={`Mensagem para #${selectedChannel.name}`} className="min-h-12 resize-none rounded-xl border-orange-300/20 bg-black/40 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" rows={1} /></div><Button size="icon" className="size-12 rounded-xl bg-orange-500 text-black hover:bg-orange-400"><SendHorizontal className="size-4" /></Button></form>}</section><aside className="hidden w-60 border-l border-orange-300/15 bg-black/15 p-5 xl:block"><p className="cyber-label">Online — {presence.length}</p><div className="mt-5 space-y-2">{presence.map(member => <div key={member.userId} className="flex items-center gap-2 py-1.5"><Avatar className="size-7"><AvatarFallback className="rounded-lg bg-orange-400/10 text-[10px] text-orange-100">{initials(member.name)}</AvatarFallback></Avatar><span className="truncate text-xs font-semibold text-stone-300">{member.name}</span><span className="ml-auto size-1.5 rounded-full bg-emerald-400" /></div>)}</div></aside></div></section>
-  </section><CommandTelemetryRail channelName={selectedChannel?.name ?? "geral"} onlineCount={presence.length} voiceCount={activeRoomMembers.length} messageCount={channelMessages.length} activeCall={Boolean(activeCallChannelId)} operators={presence} /><CollaborationDrawer messages={messages[selectedChannelId] ?? []} pinnedIds={pinnedIds[selectedChannelId] ?? []} presence={presence} profileId={profile.id} profileName={profile.name} status={status} statusMessage={statusMessage} searchQuery={searchQuery} searchResults={searchResults} activeCall={Boolean(activeCallChannelId)} pushToTalkEnabled={pushToTalkEnabled} pushToTalkKey={pushToTalkKey} isTransmitting={isTransmitting} canManage={currentRole === "admin"} readOnly={channelPermissions[selectedChannelId]?.readOnly ?? false} invitePolicy={channelPermissions[selectedChannelId]?.invitePolicy ?? "member"} onStatusChange={updateStatus} onSearch={searchMessages} onReact={reactToMessage} onPin={togglePin} onReply={message => { setThreadParent(message); setNotice(`Respondendo em thread a ${message.authorName}.`); }} onInvite={inviteToCall} onTogglePushToTalk={() => setPushToTalkEnabled(current => !current)} onPushToTalkKeyChange={setPushToTalkKey} onToggleReadOnly={toggleReadOnly} onSetRole={setMemberRole} onToggleInvitePolicy={toggleInvitePolicy} />{activeCallChannelId && !callStageOpen && <div className="fixed bottom-4 right-4 z-20 w-[min(92vw,360px)]"><button onClick={() => setCallStageOpen(true)} className="cyber-panel cyber-corner w-full p-3 text-left"><span className="cyber-label flex items-center gap-2"><MonitorUp className="size-4" />Abrir palco</span><span className="mt-1 block text-[11px] text-stone-400">Equipe e conversa permanecem disponíveis</span>{stageParticipants[0] && <div className="mt-3 h-28 overflow-hidden border border-orange-300/20"><MediaTile {...stageParticipants[0]} className="h-full min-h-0 rounded-none" /></div>}</button></div>}{activeCallChannelId && callStageOpen && <CallStage roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"} participants={stageParticipants} microphoneOn={microphoneOn} cameraOn={cameraOn} sharingScreen={Boolean(screenStream)} handRaised={handRaised} diagnostics={peerAudioDiagnostics} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onToggleHandRaise={toggleHandRaise} onLeave={leaveVoice} onMinimize={() => setCallStageOpen(false)} />}</main>;
+  </section><CommandTelemetryRail channelName={selectedChannel?.name ?? "geral"} onlineCount={presence.length} voiceCount={activeRoomMembers.length} messageCount={channelMessages.length} activeCall={Boolean(activeCallChannelId)} operators={presence} /><CollaborationDrawer messages={messages[selectedChannelId] ?? []} pinnedIds={pinnedIds[selectedChannelId] ?? []} presence={presence} profileId={profile.id} profileName={profile.name} status={status} statusMessage={statusMessage} searchQuery={searchQuery} searchResults={searchResults} activeCall={Boolean(activeCallChannelId)} pushToTalkEnabled={pushToTalkEnabled} pushToTalkKey={pushToTalkKey} isTransmitting={isTransmitting} canManage={currentRole === "admin"} readOnly={channelPermissions[selectedChannelId]?.readOnly ?? false} invitePolicy={channelPermissions[selectedChannelId]?.invitePolicy ?? "member"} onStatusChange={updateStatus} onSearch={searchMessages} onReact={reactToMessage} onPin={togglePin} onReply={message => { setThreadParent(message); setNotice(`Respondendo em thread a ${message.authorName}.`); }} onInvite={inviteToCall} onTogglePushToTalk={() => setPushToTalkEnabled(current => !current)} onPushToTalkKeyChange={setPushToTalkKey} onToggleReadOnly={toggleReadOnly} onSetRole={setMemberRole} onToggleInvitePolicy={toggleInvitePolicy} />{activeCallChannelId && <CallAudioSink streams={remoteStreams} volumes={remoteVolumes} onBlocked={blocked => setAudioBlocked(blocked)} />}{activeCallChannelId && audioBlocked && <button onClick={unblockAudio} className="fixed inset-x-0 top-3 z-[60] mx-auto flex w-[min(92vw,420px)] items-center justify-center gap-2 rounded-xl border border-orange-300/40 bg-orange-500 px-4 py-3 text-sm font-semibold text-black shadow-lg"><Volume2 className="size-4" />Toque para ouvir a chamada</button>}{activeCallChannelId && !callStageOpen && <div className="fixed bottom-4 right-4 z-20 w-[min(92vw,360px)]"><button onClick={() => setCallStageOpen(true)} className="cyber-panel cyber-corner w-full p-3 text-left"><span className="cyber-label flex items-center gap-2"><MonitorUp className="size-4" />Abrir palco</span><span className="mt-1 block text-[11px] text-stone-400">Equipe e conversa permanecem disponíveis</span>{stageParticipants[0] && <div className="mt-3 h-28 overflow-hidden border border-orange-300/20"><MediaTile {...stageParticipants[0]} className="h-full min-h-0 rounded-none" /></div>}</button></div>}{activeCallChannelId && callStageOpen && <CallStage roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"} participants={stageParticipants} microphoneOn={microphoneOn} cameraOn={cameraOn} sharingScreen={Boolean(screenStream)} handRaised={handRaised} diagnostics={peerAudioDiagnostics} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onToggleHandRaise={toggleHandRaise} onLeave={leaveVoice} onMinimize={() => setCallStageOpen(false)} />}</main>;
 }
