@@ -165,6 +165,7 @@ export class VybeChatRoom {
         storage: this.ctx.storage,
         token: this.env?.MONDAY_API_TOKEN,
         allowedIds: parseIdList(this.env?.VYBECHAT_TEAM_MONDAY_IDS),
+        ...(this.env?.MONDAY_API_VERSION ? { apiVersion: this.env.MONDAY_API_VERSION } : {}),
       });
       return Response.json({ team });
     } catch (error) {

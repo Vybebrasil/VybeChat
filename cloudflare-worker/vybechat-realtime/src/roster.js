@@ -13,7 +13,11 @@
 export const MONDAY_PREFIX = "monday-";
 
 const MONDAY_ENDPOINT = "https://api.monday.com/v2";
-const MONDAY_API_VERSION = "2024-10";
+// Versao atual estavel do Monday. A 2024-10 que estava aqui nem consta mais na
+// lista de suportadas (a mais antiga e 2025-04), e os campos photo_url e
+// is_deleted so existem nas versoes novas — a consulta era recusada e a tela de
+// entrada caia no campo de nome livre.
+const MONDAY_API_VERSION = "2026-07";
 const ROSTER_CACHE_KEY = "team:roster";
 export const ROSTER_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -53,13 +57,13 @@ function byName(first, second) {
   return first.name.localeCompare(second.name, "pt-BR");
 }
 
-export async function fetchMondayUsers(token, fetchImpl = fetch) {
+export async function fetchMondayUsers(token, fetchImpl = fetch, apiVersion = MONDAY_API_VERSION) {
   const response = await fetchImpl(MONDAY_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: token,
-      "API-Version": MONDAY_API_VERSION,
+      "API-Version": apiVersion,
     },
     body: JSON.stringify({ query: ROSTER_QUERY }),
   });
@@ -74,13 +78,13 @@ export async function fetchMondayUsers(token, fetchImpl = fetch) {
  * houver cache — mesmo vencido — ele vale: melhor uma foto velha do que uma
  * tela de entrada quebrada.
  */
-export async function loadRoster({ storage, token, allowedIds, now = Date.now(), fetchImpl = fetch }) {
+export async function loadRoster({ storage, token, allowedIds, now = Date.now(), fetchImpl = fetch, apiVersion = MONDAY_API_VERSION }) {
   const cached = await storage.get(ROSTER_CACHE_KEY);
   if (cached && now - cached.fetchedAt < ROSTER_TTL_MS) return { team: cached.team, source: "cache" };
   if (!token) return { team: cached?.team ?? [], source: cached ? "cache-sem-token" : "vazio" };
 
   try {
-    const users = await fetchMondayUsers(token, fetchImpl);
+    const users = await fetchMondayUsers(token, fetchImpl, apiVersion);
     const team = selectTeam(users, allowedIds);
     await storage.put(ROSTER_CACHE_KEY, { team, fetchedAt: now });
     return { team, source: "monday" };
