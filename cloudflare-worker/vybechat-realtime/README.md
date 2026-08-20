@@ -28,6 +28,35 @@ npx wrangler secret put VYBECHAT_ADMIN_SLUGS
 Para desenvolver localmente, crie `.dev.vars` (ja ignorado pelo git) com as duas
 variaveis e rode `npx wrangler dev`.
 
+## Entrada pelo Monday
+
+A tela de entrada pergunta quem esta chegando e mostra a equipe com a foto do
+Monday, em vez de a pessoa digitar o proprio nome. O id do perfil passa a ser
+`monday-<id>`: estavel, igual em qualquer aparelho, e e ele que define quem e
+administrador.
+
+```bash
+npx wrangler secret put MONDAY_API_TOKEN
+npx wrangler secret put VYBECHAT_TEAM_MONDAY_IDS
+npx wrangler secret put VYBECHAT_ADMIN_MONDAY_IDS
+```
+
+- `MONDAY_API_TOKEN`: token pessoal da API do Monday (Perfil > Desenvolvedor >
+  My Access Token). O cliente nunca fala com o Monday; so o Worker.
+- `VYBECHAT_TEAM_MONDAY_IDS`: ids separados por virgula, na ordem em que devem
+  aparecer na tela. Vazio significa "todo mundo ativo na conta".
+- `VYBECHAT_ADMIN_MONDAY_IDS`: ids de quem e administrador.
+
+O `POST /roster` exige o codigo de acesso: sem ele a lista com nomes e fotos
+ficaria aberta para qualquer um com a URL. A resposta traz apenas id, nome e
+foto — e-mail e telefone nunca saem do Worker.
+
+A lista fica em cache por 6 horas no Durable Object. Se o Monday cair, vale o
+cache mesmo vencido; sem cache nenhum, a tela cai no campo de nome livre em vez
+de barrar quem tem acesso legitimo.
+
+`VYBECHAT_ADMIN_SLUGS` segue funcionando para quem entrar por esse caminho.
+
 ## O que o Worker garante
 
 - Nenhum evento e aceito antes de um `presence:join` valido: sem o codigo correto
