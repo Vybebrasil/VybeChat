@@ -90,4 +90,15 @@ describe("VybeChatRoom collaboration integration", () => {
     const rooms = packets(member).filter(packet => packet.type === "voice:rooms").at(-1)?.payload;
     expect(rooms[0]?.members[0]?.handRaised).toBe(true);
   });
+
+  it("persiste decisões e permite que o responsável conclua a própria ação", async () => {
+    const { room, storage, member } = setup();
+    await room.handleEvent(member, "decision:create", { title: "Aprovar roteiro", ownerName: "Member", dueDate: "2026-08-22" });
+    const [decision] = await storage.get("team:decisions") as Array<{ id: string; status: string; createdBy: string }>;
+    await room.handleEvent(member, "decision:update", { id: decision.id, status: "done" });
+    const [updated] = await storage.get("team:decisions") as Array<{ status: string; createdBy: string }>;
+    expect(updated.createdBy).toBe("member@vybe.com");
+    expect(updated.status).toBe("done");
+    expect(packets(member).some(packet => packet.type === "decision:list" && packet.payload.decisions.length === 1)).toBe(true);
+  });
 });

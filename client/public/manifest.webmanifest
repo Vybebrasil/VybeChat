@@ -1,0 +1,12 @@
+{
+  "name": "VybeChat — Central de comunicação",
+  "short_name": "VybeChat",
+  "description": "Central de comunicação da equipe Vybe.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07080b",
+  "theme_color": "#ff8a00",
+  "icons": [
+    { "src": "/vybe-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

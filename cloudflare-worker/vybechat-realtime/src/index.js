@@ -32,6 +32,8 @@ function directIndexKey(userId) {
   return `direct:index:${userId}`;
 }
 
+const DECISIONS_KEY = "team:decisions";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -44,8 +46,9 @@ export default {
 };
 
 export class VybeChatRoom {
-  constructor(ctx) {
+  constructor(ctx, env) {
     this.ctx = ctx;
+    this.env = env;
   }
 
   async fetch() {
@@ -147,12 +150,25 @@ export class VybeChatRoom {
     await this.ctx.storage.put(directIndexKey(userId), threads.sort((first, second) => second.updatedAt.localeCompare(first.updatedAt)).slice(0, 80));
   }
 
+  async getDecisions() {
+    return (await this.ctx.storage.get(DECISIONS_KEY)) ?? [];
+  }
+
+  async putDecisions(decisions) {
+    await this.ctx.storage.put(DECISIONS_KEY, decisions.slice(0, 100));
+  }
+
   async handleEvent(socket, type, payload) {
     const state = this.getState(socket);
     if (!state) return;
 
     if (type === "presence:join") {
       const userId = String(payload.userId ?? "");
+      const workspaceCode = this.env?.VYBECHAT_WORKSPACE_CODE;
+      if (workspaceCode && payload.workspaceCode !== workspaceCode) {
+        socket.send(json("realtime:error", { message: "O código de acesso da equipe não foi aceito." }));
+        return;
+      }
       const storedRole = await this.ctx.storage.get(`role:${userId}`);
       this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: userId === "gestaovybe@gmail.com" ? "admin" : normalizeRole(storedRole ?? roleForUser(userId)) });
       socket.send(json("voice:rooms", this.voiceRooms()));
@@ -237,6 +253,31 @@ export class VybeChatRoom {
       const updated = { ...thread, unreadCount: 0 };
       await this.putDirectIndex(state.userId, [...index.filter(item => item.id !== threadId), updated]);
       socket.send(json("direct:read", { thread: updated }));
+      return;
+    }
+
+    if (type === "decision:list") {
+      socket.send(json("decision:list", { decisions: await this.getDecisions() }));
+      return;
+    }
+
+    if (type === "decision:create" && state.userId && typeof payload.title === "string") {
+      const title = payload.title.trim().slice(0, 240);
+      if (!title) return;
+      const decision = { id: crypto.randomUUID(), title, ownerName: String(payload.ownerName ?? state.name).slice(0, 80), dueDate: typeof payload.dueDate === "string" ? payload.dueDate.slice(0, 10) : "", status: "open", createdAt: new Date().toISOString(), createdBy: state.userId };
+      const decisions = await this.getDecisions();
+      await this.putDecisions([decision, ...decisions]);
+      this.broadcast("decision:list", { decisions: [decision, ...decisions] });
+      return;
+    }
+
+    if (type === "decision:update" && state.userId && typeof payload.id === "string" && ["open", "done"].includes(payload.status)) {
+      const decisions = await this.getDecisions();
+      const current = decisions.find(decision => decision.id === payload.id);
+      if (!current || (current.createdBy !== state.userId && !canModerate(state.role))) return;
+      const updated = decisions.map(decision => decision.id === payload.id ? { ...decision, status: payload.status } : decision);
+      await this.putDecisions(updated);
+      this.broadcast("decision:list", { decisions: updated });
       return;
     }
 
