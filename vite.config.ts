@@ -170,10 +170,19 @@ function vitePluginCloudflarePublicEntry(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginCloudflarePublicEntry()];
+// Ferramentas de desenvolvimento do Manus. O runtime inline sozinho responde por
+// ~367 KB dentro do index.html publicado e o jsxLocPlugin carimba um atributo
+// data-loc em cada elemento. Nada disso e usado pela build do Cloudflare Pages,
+// entao so entram no dev e nas builds hospedadas no Manus.
+const manusDevPlugins = () => [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
-export default defineConfig({
-  plugins,
+export default defineConfig(({ command }) => ({
+  plugins: [
+    react(),
+    tailwindcss(),
+    ...(command === "build" && isCloudflareBuild ? [] : manusDevPlugins()),
+    vitePluginCloudflarePublicEntry(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -208,4 +217,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));

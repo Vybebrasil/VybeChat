@@ -16,12 +16,14 @@ class FakeSocket {
   send(value: string) { this.sent.push(value); }
 }
 
-function setup() {
+const WORKSPACE_CODE = "codigo-da-equipe";
+
+function setup(env: Record<string, string> = { VYBECHAT_WORKSPACE_CODE: WORKSPACE_CODE }) {
   const storage = new MemoryStorage();
   const admin = new FakeSocket({ socketId: "admin-socket", userId: "gestaovybe@gmail.com", name: "Admin", status: "online", role: "admin", callChannelId: null });
   const member = new FakeSocket({ socketId: "member-socket", userId: "member@vybe.com", name: "Member", status: "online", role: "member", callChannelId: null });
   const sockets = [admin, member];
-  const room = new VybeChatRoom({ storage, getWebSockets: () => sockets });
+  const room = new VybeChatRoom({ storage, getWebSockets: () => sockets }, env);
   return { room, storage, admin, member, sockets };
 }
 
@@ -66,9 +68,52 @@ describe("VybeChatRoom collaboration integration", () => {
     await room.handleEvent(admin, "team:role:update", { userId: "lead@vybe.com", role: "admin" });
     const reconnected = new FakeSocket({ socketId: "lead-reconnected", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
     sockets.push(reconnected);
-    await room.handleEvent(reconnected, "presence:join", { userId: "lead@vybe.com", name: "Lead", status: "online" });
+    await room.handleEvent(reconnected, "presence:join", { userId: "lead@vybe.com", name: "Lead", status: "online", workspaceCode: WORKSPACE_CODE });
     expect(await storage.get("role:lead@vybe.com")).toBe("admin");
     expect(reconnected.deserializeAttachment().role).toBe("admin");
+  });
+
+  it("recusa presence:join quando o codigo de acesso nao confere", async () => {
+    const { room, sockets } = setup();
+    const visitante = new FakeSocket({ socketId: "visitante", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
+    sockets.push(visitante);
+    await room.handleEvent(visitante, "presence:join", { userId: "invasor", name: "Invasor", workspaceCode: "errado" });
+    expect(visitante.deserializeAttachment().userId).toBeNull();
+    expect(packets(visitante).at(-1)).toMatchObject({ type: "realtime:error", payload: { code: "auth" } });
+  });
+
+  it("recusa presence:join quando o Worker nao tem codigo configurado", async () => {
+    const { room, sockets } = setup({});
+    const visitante = new FakeSocket({ socketId: "visitante", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
+    sockets.push(visitante);
+    await room.handleEvent(visitante, "presence:join", { userId: "qualquer", name: "Qualquer", workspaceCode: "" });
+    expect(visitante.deserializeAttachment().userId).toBeNull();
+    expect(packets(visitante).at(-1)).toMatchObject({ type: "realtime:error", payload: { code: "auth" } });
+  });
+
+  it("nao entrega historico para conexao que ainda nao autenticou", async () => {
+    const { room, sockets } = setup();
+    const visitante = new FakeSocket({ socketId: "visitante", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
+    sockets.push(visitante);
+    await room.handleEvent(visitante, "channel:join", { channelId: 1 });
+    expect(packets(visitante).some(packet => packet.type === "message:history")).toBe(false);
+    expect(packets(visitante).at(-1)).toMatchObject({ type: "realtime:error", payload: { code: "auth" } });
+  });
+
+  it("promove a admin pelo slug configurado em VYBECHAT_ADMIN_SLUGS", async () => {
+    const { room, sockets } = setup({ VYBECHAT_WORKSPACE_CODE: WORKSPACE_CODE, VYBECHAT_ADMIN_SLUGS: "paulo, mizinho" });
+    const chefe = new FakeSocket({ socketId: "chefe", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
+    sockets.push(chefe);
+    await room.handleEvent(chefe, "presence:join", { userId: "paulo-m1abc-x9y2", name: "Paulo", workspaceCode: WORKSPACE_CODE });
+    expect(chefe.deserializeAttachment().role).toBe("admin");
+  });
+
+  it("nao promove quem apenas comeca com um trecho do slug", async () => {
+    const { room, sockets } = setup({ VYBECHAT_WORKSPACE_CODE: WORKSPACE_CODE, VYBECHAT_ADMIN_SLUGS: "paulo" });
+    const outro = new FakeSocket({ socketId: "outro", userId: null, name: "Visitante", status: "offline", role: "member", callChannelId: null });
+    sockets.push(outro);
+    await room.handleEvent(outro, "presence:join", { userId: "paulozinho-m1abc-x9y2", name: "Paulozinho", workspaceCode: WORKSPACE_CODE });
+    expect(outro.deserializeAttachment().role).toBe("member");
   });
 
   it("persists direct messages, emits them to the recipient and clears the local unread counter", async () => {

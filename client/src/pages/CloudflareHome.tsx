@@ -64,6 +64,7 @@ export default function CloudflareHome() {
   const { preferences: notificationPreferences, requestPermission, toggleQuiet, notify } = useVybeNotifications();
   const [name, setName] = useState("");
   const [workspaceCode, setWorkspaceCode] = useState(() => loadWorkspaceCode());
+  const [authError, setAuthError] = useState("");
   const [selectedChannelId, setSelectedChannelId] = useState(1);
   const [messages, setMessages] = useState<Record<number, ExternalMessage[]>>({});
   const [draft, setDraft] = useState("");
@@ -263,7 +264,17 @@ export default function CloudflareHome() {
     socket.on("call:screen-share", ({ channelId, name }: { channelId: number; name: string | null }) => {
       if (channelId === activeCallRef.current) setScreenSharer(name);
     });
-    socket.on("realtime:error", ({ message }: { message: string }) => setNotice(message));
+    socket.on("realtime:error", ({ message, code }: { message: string; code?: string }) => {
+      // O worker recusou o acesso: devolve a pessoa para a tela de entrada em vez
+      // de deixar ela presa num shell vazio achando que o app quebrou.
+      if (code === "auth") {
+        setAuthError(message);
+        try { localStorage.removeItem(PROFILE_KEY); } catch { /* storage indisponivel */ }
+        setProfile(null);
+        return;
+      }
+      setNotice(message);
+    });
     socket.connect();
     if (socket.connected) announce();
     return () => {
@@ -358,6 +369,7 @@ export default function CloudflareHome() {
     event.preventDefault();
     const next = createLocalProfile(name);
     if (!next) return;
+    setAuthError("");
     localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
     localStorage.setItem(WORKSPACE_CODE_KEY, workspaceCode);
     setProfile(next);
@@ -543,7 +555,7 @@ export default function CloudflareHome() {
   };
 
   if (!profile) {
-    return <main className="cyber-grid grid min-h-screen place-items-center overflow-hidden p-5"><form onSubmit={submitProfile} className="cyber-panel cyber-corner cyber-reveal w-full max-w-md p-1"><div className="border border-orange-300/15 bg-[#0c0d10]/80 p-7 sm:p-9"><div className="flex items-center justify-between"><p className="cyber-label">VybeChat</p><span className="signal-pulse size-2 rounded-full bg-orange-400" /></div><h1 className="mt-6 font-sans text-3xl font-semibold tracking-tight text-orange-100">Entre para conversar<br />com a equipe.</h1><p className="mt-2 text-sm leading-6 text-stone-400">Escolha um nome. Nós vamos lembrar você neste dispositivo.</p><div className="my-7 h-px bg-gradient-to-r from-orange-500/70 via-orange-200/10 to-transparent" /><div className="space-y-3"><Input value={name} onChange={event => setName(event.target.value)} placeholder="Seu nome" autoComplete="username" className="h-12 rounded-xl border-orange-300/20 bg-black/50 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" /><Input value={workspaceCode} onChange={event => setWorkspaceCode(event.target.value)} placeholder="Código da equipe (se solicitado)" type="password" autoComplete="off" className="h-12 rounded-xl border-orange-300/20 bg-black/50 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" /><Button className="h-12 w-full rounded-xl bg-orange-500 font-semibold text-black hover:bg-orange-400">Entrar no VybeChat</Button></div><p className="mt-5 text-xs text-stone-500">Sem senha e sem e-mail. Caso a equipe ative um código, ele será solicitado aqui.</p></div></form></main>;
+    return <main className="cyber-grid grid min-h-screen place-items-center overflow-hidden p-5"><form onSubmit={submitProfile} className="cyber-panel cyber-corner cyber-reveal w-full max-w-md p-1"><div className="border border-orange-300/15 bg-[#0c0d10]/80 p-7 sm:p-9"><div className="flex items-center justify-between"><p className="cyber-label">VybeChat</p><span className="signal-pulse size-2 rounded-full bg-orange-400" /></div><h1 className="mt-6 font-sans text-3xl font-semibold tracking-tight text-orange-100">Entre para conversar<br />com a equipe.</h1><p className="mt-2 text-sm leading-6 text-stone-400">Escolha um nome. Nós vamos lembrar você neste dispositivo.</p><div className="my-7 h-px bg-gradient-to-r from-orange-500/70 via-orange-200/10 to-transparent" /><div className="space-y-3"><Input value={name} onChange={event => setName(event.target.value)} placeholder="Seu nome" autoComplete="username" className="h-12 rounded-xl border-orange-300/20 bg-black/50 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" /><Input value={workspaceCode} onChange={event => setWorkspaceCode(event.target.value)} placeholder="Código da equipe (se solicitado)" type="password" autoComplete="off" className="h-12 rounded-xl border-orange-300/20 bg-black/50 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" /><Button className="h-12 w-full rounded-xl bg-orange-500 font-semibold text-black hover:bg-orange-400">Entrar no VybeChat</Button></div>{authError ? <p role="alert" className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-xs leading-5 text-red-200">{authError}</p> : null}<p className="mt-5 text-xs text-stone-500">Sem senha e sem e-mail. Caso a equipe ative um código, ele será solicitado aqui.</p></div></form></main>;
   }
 
   const sidebar = <aside className={`${mobileSidebarOpen ? "fixed inset-y-0 left-0 z-40 flex w-[292px] shadow-2xl" : "hidden"} cyber-panel flex-col bg-[#0a0b0f]/98 md:relative md:flex md:w-[292px] md:shrink-0`}>
