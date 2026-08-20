@@ -154,10 +154,18 @@ const isCloudflareBuild = process.env.VITE_DEPLOY_TARGET === "cloudflare";
 
 function vitePluginCloudflarePublicEntry(): Plugin {
   return {
-    name: "vybechat-cloudflare-public-entry",
-    transformIndexHtml(html) {
-      if (!isCloudflareBuild) return html;
-      return html.replace('src="/src/main.tsx"', 'src="/src/cloudflare-main.tsx"');
+    name: "vybechat-cloudflare-index-output",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_, bundle) {
+      if (!isCloudflareBuild) return;
+      const cloudflareHtml = bundle["cloudflare.html"];
+      if (!cloudflareHtml || cloudflareHtml.type !== "asset") {
+        throw new Error("O documento Cloudflare não foi gerado pelo build.");
+      }
+      cloudflareHtml.fileName = "index.html";
+      bundle["index.html"] = cloudflareHtml;
+      delete bundle["cloudflare.html"];
     },
   };
 }
@@ -180,6 +188,9 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     target: "safari13",
+    rollupOptions: isCloudflareBuild
+      ? { input: path.resolve(import.meta.dirname, "client", "cloudflare.html") }
+      : undefined,
   },
   server: {
     host: true,

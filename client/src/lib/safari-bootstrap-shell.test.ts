@@ -6,12 +6,12 @@ const clientRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 describe("shell público compatível com Safari", () => {
   it("mantém a sobreposição de diagnóstico até receber a confirmação de montagem", () => {
-    const html = readFileSync(`${clientRoot}/index.html`, "utf8");
+    const html = readFileSync(`${clientRoot}/cloudflare.html`, "utf8");
 
     expect(html).toContain("window.__vybechatBootstrap");
     expect(html).toContain("VYBE-SAFARI-JS");
     expect(html).toContain("safari-diagnostic.html");
-    expect(html).toContain('src="/src/main.tsx"');
+    expect(html).toContain('src="/src/cloudflare-main.tsx"');
   });
 
   it("oferece uma rota estática sem React para diagnóstico", () => {
@@ -24,7 +24,9 @@ describe("shell público compatível com Safari", () => {
   it("seleciona o documento Cloudflare no build público", () => {
     const viteConfig = readFileSync(`${clientRoot}/../vite.config.ts`, "utf8");
 
-    expect(viteConfig).toContain("return html.replace('src=\"/src/main.tsx\"', 'src=\"/src/cloudflare-main.tsx\"')");
+    expect(viteConfig).toContain('input: path.resolve(import.meta.dirname, "client", "cloudflare.html")');
+    expect(viteConfig).toContain('bundle["cloudflare.html"]');
+    expect(viteConfig).toContain('bundle["index.html"] = cloudflareHtml');
     expect(viteConfig).toContain("VITE_DEPLOY_TARGET === \"cloudflare\"");
   });
 });
