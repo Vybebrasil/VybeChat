@@ -9,7 +9,7 @@ import { NotificationControl } from "@/components/NotificationControl";
 import { DecisionsDrawer, type TeamDecision } from "@/components/DecisionsDrawer";
 import { MediaTile } from "@/components/MediaTile";
 import { VoiceContextDock } from "@/components/VoiceContextDock";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,8 @@ import { createSpeakingDetector } from "@/lib/speaking-detector";
 import { getIceServers } from "@/lib/ice-config";
 import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
+import { TeamLogin } from "@/components/TeamLogin";
+import { toProfileId, type TeamMember } from "@/lib/team-roster";
 import { summarizePeerAudioStats, type PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 import { getRealtimeSocket } from "@/lib/realtime";
 import { useVybeNotifications } from "@/lib/use-vybe-notifications";
@@ -30,8 +32,8 @@ import type { VoiceRoom } from "@/lib/voice-room-state";
 import { Bell, Hash, LogOut, Menu, Mic, MicOff, MonitorUp, Phone, Pin, Search, SendHorizontal, SmilePlus, UserPlus, Video, VideoOff, Volume2, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
-type Profile = LocalProfile;
-type Presence = { userId: string; name: string; status: "online" | "away" | "offline" | "focus" | "meeting"; statusMessage?: string; role?: "admin" | "moderator" | "member" };
+type Profile = LocalProfile & { photo?: string };
+type Presence = { userId: string; name: string; photo?: string; status: "online" | "away" | "offline" | "focus" | "meeting"; statusMessage?: string; role?: "admin" | "moderator" | "member" };
 type ExternalMessage = { id: string; channelId: number; userId: string; authorName: string; content: string; createdAt: string; parentId?: string | null; reactions?: Record<string, string[]> };
 type RemoteStream = { socketId: string; stream: MediaStream };
 type CallPeer = { socketId: string; name: string };
@@ -66,7 +68,6 @@ function loadProfile(): Profile | null {
 export default function CloudflareHome() {
   const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
   const { preferences: notificationPreferences, requestPermission, toggleQuiet, notify } = useVybeNotifications();
-  const [name, setName] = useState("");
   const [workspaceCode, setWorkspaceCode] = useState(() => loadWorkspaceCode());
   const [authError, setAuthError] = useState("");
   const [selectedChannelId, setSelectedChannelId] = useState(1);
@@ -238,7 +239,7 @@ export default function CloudflareHome() {
     if (!profile) return;
     const socket = socketRef.current;
     const announce = () => {
-      socket.emit("presence:join", { userId: profile.id, name: profile.name, status, statusMessage, workspaceCode });
+      socket.emit("presence:join", { userId: profile.id, name: profile.name, photo: profile.photo ?? "", status, statusMessage, workspaceCode });
       socket.emit("channel:join", { channelId: selectedChannelIdRef.current });
       socket.emit("direct:list", {});
       socket.emit("decision:list", {});
@@ -477,14 +478,23 @@ export default function CloudflareHome() {
     return [...local, ...remote];
   }, [activeRoomMembers, cameraOn, callPeers, handRaised, localStream, microphoneOn, profile, remoteStreams, remoteVolumes, screenSharer, screenStream]);
 
-  const submitProfile = (event: FormEvent) => {
-    event.preventDefault();
-    const next = createLocalProfile(name);
-    if (!next) return;
+  const guardarPerfil = (next: Profile, codigo: string) => {
     setAuthError("");
     localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
-    localStorage.setItem(WORKSPACE_CODE_KEY, workspaceCode);
+    localStorage.setItem(WORKSPACE_CODE_KEY, codigo);
+    setWorkspaceCode(codigo);
     setProfile(next);
+  };
+
+  const entrarComoMembro = (pessoa: TeamMember, codigo: string) => {
+    // O id vem do Monday: o mesmo em qualquer aparelho, e e ele que define quem
+    // e administrador — sem depender do nome que a pessoa digitou.
+    guardarPerfil({ id: toProfileId(pessoa.id), name: pessoa.name, photo: pessoa.photo }, codigo);
+  };
+
+  const entrarPorNome = (valor: string, codigo: string) => {
+    const next = createLocalProfile(valor);
+    if (next) guardarPerfil(next, codigo);
   };
 
   const selectChannel = (channelId: number) => {
@@ -676,14 +686,20 @@ export default function CloudflareHome() {
   };
 
   if (!profile) {
-    return <main className="cyber-grid grid min-h-screen place-items-center overflow-hidden p-5"><form onSubmit={submitProfile} className="cyber-panel cyber-corner cyber-reveal w-full max-w-md p-1"><div className="border border-orange-300/15 bg-[#0c0d10]/80 p-7 sm:p-9"><div className="flex items-center justify-between"><p className="cyber-label">VybeChat</p><span className="signal-pulse size-2 rounded-full bg-orange-400" /></div><h1 className="mt-6 font-sans text-3xl font-semibold tracking-tight text-orange-100">Entre para conversar<br />com a equipe.</h1><p className="mt-2 text-sm leading-6 text-stone-400">Escolha um nome. Nós vamos lembrar você neste dispositivo.</p><div className="my-7 h-px bg-gradient-to-r from-orange-500/70 via-orange-200/10 to-transparent" /><div className="space-y-3"><Input value={name} onChange={event => setName(event.target.value)} placeholder="Seu nome" autoComplete="username" className="h-12 rounded-xl border-orange-300/20 bg-black/50 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" /><Input value={workspaceCode} onChange={event => setWorkspaceCode(event.target.value)} placeholder="Código da equipe (se solicitado)" type="password" autoComplete="off" className="h-12 rounded-xl border-orange-300/20 bg-black/50 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" /><Button className="h-12 w-full rounded-xl bg-orange-500 font-semibold text-black hover:bg-orange-400">Entrar no VybeChat</Button></div>{authError ? <p role="alert" className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-xs leading-5 text-red-200">{authError}</p> : null}<p className="mt-5 text-xs text-stone-500">Sem senha e sem e-mail. Caso a equipe ative um código, ele será solicitado aqui.</p></div></form></main>;
+    return <TeamLogin
+      workerUrl={String(import.meta.env.VITE_REALTIME_WORKER_URL ?? "")}
+      codigoInicial={workspaceCode}
+      erroExterno={authError}
+      onEntrar={entrarComoMembro}
+      onEntrarPorNome={entrarPorNome}
+    />;
   }
 
   const sidebar = <aside className={`${mobileSidebarOpen ? "fixed inset-y-0 left-0 z-40 flex w-[292px] shadow-2xl" : "hidden"} cyber-panel flex-col bg-[#0a0b0f]/98 md:relative md:flex md:w-[292px] md:shrink-0`}>
     <div className="border-b border-orange-300/15 px-5 py-5"><div className="flex items-start justify-between"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl border border-orange-300/45 bg-orange-400/10 text-sm font-extrabold text-orange-300">V</span><div><p className="cyber-label">Equipe Vybe</p><h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-orange-100">VybeChat</h2></div></div><button onClick={() => setMobileSidebarOpen(false)} className="grid size-8 rounded-lg border border-orange-300/15 text-orange-200 md:hidden" aria-label="Fechar canais"><X className="size-4" /></button></div><div className="mt-4 flex items-center gap-2 text-xs text-stone-400"><span className="size-1.5 rounded-full bg-emerald-400" />Todos os sistemas online</div></div>
     <div className="flex-1 overflow-y-auto px-3 py-4"><CommandNavigation groups={EXTERNAL_WORKSPACE} selectedChannelId={selectedChannelId} voiceRooms={voiceRooms} onSelectText={selectChannel} onJoinVoice={prepareVoice} /></div>
     {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
-    <div className="flex items-center gap-2 border-t border-orange-300/15 p-3"><Avatar className="size-9"><AvatarFallback className="rounded-xl border border-orange-300/25 bg-orange-400/10 text-xs text-orange-100">{initials(profile.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-orange-50">{profile.name}</p><p className="text-[11px] text-emerald-400">Online</p></div><button onClick={() => { leaveVoice(); localStorage.removeItem(PROFILE_KEY); setProfile(null); }} aria-label="Sair"><LogOut className="size-4 text-stone-500" /></button></div>
+    <div className="flex items-center gap-2 border-t border-orange-300/15 p-3"><Avatar className="size-9">{profile.photo ? <AvatarImage src={profile.photo} alt="" className="rounded-xl object-cover" /> : null}<AvatarFallback className="rounded-xl border border-orange-300/25 bg-orange-400/10 text-xs text-orange-100">{initials(profile.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-orange-50">{profile.name}</p><p className="text-[11px] text-emerald-400">Online</p></div><button onClick={() => { leaveVoice(); localStorage.removeItem(PROFILE_KEY); setProfile(null); }} aria-label="Sair"><LogOut className="size-4 text-stone-500" /></button></div>
   </aside>;
 
   const currentRole = presence.find(member => member.userId === profile.id)?.role ?? "member";

@@ -1,4 +1,5 @@
 import { canInvite, canManagePermissions, canModerate, canPost, normalizePermissions, normalizeRole } from "./policy.js";
+import { loadRoster, MONDAY_PREFIX, parseIdList } from "./roster.js";
 
 const CHANNEL_IDS = Array.from({ length: 17 }, (_, index) => index + 1);
 
@@ -28,7 +29,14 @@ function adminSlugs(env) {
 // O cliente monta o userId como `${slug-do-nome}-${timestamp}-${aleatorio}`.
 // Comparar o id inteiro nunca casa, entao conferimos apenas o prefixo do slug.
 function roleForUser(userId, env) {
-  const id = String(userId ?? "").toLocaleLowerCase();
+  const raw = String(userId ?? "");
+  // Quem entra pelo seletor do Monday tem id estavel: comparamos o id exato em
+  // vez de adivinhar pelo nome digitado.
+  if (raw.startsWith(MONDAY_PREFIX)) {
+    const mondayId = raw.slice(MONDAY_PREFIX.length);
+    return parseIdList(env?.VYBECHAT_ADMIN_MONDAY_IDS).includes(mondayId) ? "admin" : "member";
+  }
+  const id = raw.toLocaleLowerCase();
   return adminSlugs(env).some(slug => id === slug || id.startsWith(`${slug}-`)) ? "admin" : "member";
 }
 
@@ -50,6 +58,34 @@ function directIndexKey(userId) {
 
 const DECISIONS_KEY = "team:decisions";
 
+// O /roster e chamado pelo navegador de outra origem (Pages -> workers.dev),
+// entao precisa de CORS. Sem isso a tela de entrada nem consegue perguntar.
+function allowedOrigin(request, env) {
+  const origin = request.headers.get("Origin");
+  if (!origin) return null;
+  const configuradas = String(env?.VYBECHAT_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+  if (configuradas.length) return configuradas.includes(origin) ? origin : null;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (hostname === "localhost" || hostname === "127.0.0.1") return origin;
+    if (protocol === "https:" && hostname.endsWith(".pages.dev")) return origin;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function withCors(response, origin) {
+  if (!origin) return response;
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Vary", "Origin");
+  return new Response(response.body, { status: response.status, headers });
+}
+
 // Comparacao de tempo constante: evita descobrir o codigo medindo o tempo de resposta.
 function timingSafeEqual(candidate, expected) {
   const a = String(candidate);
@@ -65,6 +101,25 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ status: "ok", service: "vybechat-realtime" });
+    if (url.pathname === "/roster") {
+      const origin = allowedOrigin(request, env);
+      if (request.method === "OPTIONS") {
+        if (!origin) return new Response(null, { status: 403 });
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Max-Age": "86400",
+            Vary: "Origin",
+          },
+        });
+      }
+      if (request.method !== "POST") return withCors(new Response("Method not allowed", { status: 405 }), origin);
+      const response = await env.VYBECHAT_ROOM.getByName("vybe-os").fetch(request);
+      return withCors(response, origin);
+    }
     const match = url.pathname.match(/^\/room\/([a-z0-9-]{1,80})$/i);
     if (!match) return new Response("VybeChat realtime worker", { status: 200 });
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -78,7 +133,8 @@ export class VybeChatRoom {
     this.env = env;
   }
 
-  async fetch() {
+  async fetch(request) {
+    if (request && new URL(request.url).pathname === "/roster") return this.handleRoster(request);
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.serializeAttachment({
@@ -87,6 +143,36 @@ export class VybeChatRoom {
     });
     this.ctx.acceptWebSocket(server);
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  /**
+   * Entrega a equipe para a tela de entrada. Exige o codigo de acesso: sem ele
+   * a lista com nomes e fotos ficaria aberta para qualquer um com a URL.
+   */
+  async handleRoster(request) {
+    const expected = this.env?.VYBECHAT_WORKSPACE_CODE;
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Requisicao invalida." }, { status: 400 });
+    }
+    if (!expected || !timingSafeEqual(String(body.workspaceCode ?? ""), expected)) {
+      return Response.json({ error: "O código de acesso da equipe não foi aceito.", code: "auth" }, { status: 401 });
+    }
+    try {
+      const { team } = await loadRoster({
+        storage: this.ctx.storage,
+        token: this.env?.MONDAY_API_TOKEN,
+        allowedIds: parseIdList(this.env?.VYBECHAT_TEAM_MONDAY_IDS),
+      });
+      return Response.json({ team });
+    } catch (error) {
+      // O codigo ja foi aceito: devolvemos lista vazia para a tela cair no
+      // campo de nome em vez de barrar quem tem acesso legitimo.
+      console.warn("[VybeChat] roster indisponivel", error);
+      return Response.json({ team: [], degraded: true });
+    }
   }
 
   async webSocketMessage(socket, raw) {
@@ -137,7 +223,7 @@ export class VybeChatRoom {
     const byUser = new Map();
     for (const socket of this.sockets()) {
       const state = this.getState(socket);
-      if (state?.userId) byUser.set(state.userId, { userId: state.userId, name: state.name, status: state.status, statusMessage: state.statusMessage, role: state.role });
+      if (state?.userId) byUser.set(state.userId, { userId: state.userId, name: state.name, photo: state.photo ?? "", status: state.status, statusMessage: state.statusMessage, role: state.role });
     }
     return Array.from(byUser.values());
   }
@@ -225,7 +311,7 @@ export class VybeChatRoom {
         return;
       }
       const storedRole = await this.ctx.storage.get(`role:${userId}`);
-      this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: normalizeRole(storedRole ?? roleForUser(userId, this.env)) });
+      this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), photo: String(payload.photo ?? "").slice(0, 400), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: normalizeRole(storedRole ?? roleForUser(userId, this.env)) });
       // O cliente precisa do proprio socketId para resolver colisao de ofertas
       // na chamada sem trocar mensagem extra entre os pares.
       socket.send(json("session:ready", { socketId: state.socketId }));
