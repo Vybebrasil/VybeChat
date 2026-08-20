@@ -268,7 +268,11 @@ export default function CloudflareHome() {
       // O worker recusou o acesso: devolve a pessoa para a tela de entrada em vez
       // de deixar ela presa num shell vazio achando que o app quebrou.
       if (code === "auth") {
-        setAuthError(message);
+        // O cliente dispara channel:join, direct:list e decision:list logo apos o
+        // presence:join. Quando o acesso e recusado, os quatro voltam com erro e o
+        // generico sobrescrevia justamente a mensagem que explica o motivo. Vale a
+        // primeira; submitProfile limpa antes de cada nova tentativa.
+        setAuthError(previous => previous || message);
         try { localStorage.removeItem(PROFILE_KEY); } catch { /* storage indisponivel */ }
         setProfile(null);
         return;

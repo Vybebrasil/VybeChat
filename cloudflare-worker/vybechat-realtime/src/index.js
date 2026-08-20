@@ -192,7 +192,7 @@ export class VybeChatRoom {
     // Portao de autenticacao. Antes de um presence:join valido a conexao nao le
     // nem escreve nada: sem historico, sem presenca, sem sinalizacao de chamada.
     if (type !== "presence:join" && !state.userId) {
-      socket.send(json("realtime:error", { code: "auth", message: "Sessao nao autenticada. Entre novamente no VybeChat." }));
+      socket.send(json("realtime:error", { code: "auth", message: "Sessão não autenticada. Entre novamente no VybeChat." }));
       return;
     }
 
@@ -201,7 +201,7 @@ export class VybeChatRoom {
       const workspaceCode = this.env?.VYBECHAT_WORKSPACE_CODE;
       // Fail-closed: sem o secret configurado ninguem entra, em vez de liberar a sala inteira.
       if (!workspaceCode) {
-        socket.send(json("realtime:error", { code: "auth", message: "O VybeChat ainda nao foi liberado. Configure o codigo de acesso da equipe no Worker." }));
+        socket.send(json("realtime:error", { code: "auth", message: "O VybeChat ainda não foi liberado. Configure o código de acesso da equipe no Worker." }));
         return;
       }
       if (!timingSafeEqual(String(payload.workspaceCode ?? ""), workspaceCode)) {
@@ -209,7 +209,7 @@ export class VybeChatRoom {
         return;
       }
       if (!userId) {
-        socket.send(json("realtime:error", { code: "auth", message: "Nao foi possivel identificar o seu perfil. Entre novamente." }));
+        socket.send(json("realtime:error", { code: "auth", message: "Não foi possível identificar o seu perfil. Entre novamente." }));
         return;
       }
       const storedRole = await this.ctx.storage.get(`role:${userId}`);
