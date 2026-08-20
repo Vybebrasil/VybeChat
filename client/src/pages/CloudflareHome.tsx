@@ -12,6 +12,7 @@ import { getSelectedAudioTrack, listAudioInputs, type AudioInput } from "@/lib/a
 import { getCallMedia, getCallMediaErrorMessage } from "@/lib/call-media";
 import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
 import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspace";
+import { drainIceCandidates, queueIceCandidate, type PendingIceCandidates } from "@/lib/ice-candidates";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { summarizePeerAudioStats, type PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 import { getRealtimeSocket } from "@/lib/realtime";
@@ -81,6 +82,7 @@ export default function CloudflareHome() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const activeCallRef = useRef<number | null>(null);
   const peerConnectionsRef = useRef(new Map<string, RTCPeerConnection>());
+  const pendingIceCandidatesRef = useRef<PendingIceCandidates>(new Map());
 
   const selectedChannel = useMemo(() => findExternalChannel(selectedChannelId), [selectedChannelId]);
   const isContextPreview = window.location.pathname === "/cloudflare-preview" && new URLSearchParams(window.location.search).get("demo") === "1" && new URLSearchParams(window.location.search).get("call") === "1";
@@ -95,6 +97,17 @@ export default function CloudflareHome() {
     }
   }, []);
 
+  const flushPendingIceCandidates = async (peerId: string, connection: RTCPeerConnection) => {
+    if (!connection.remoteDescription) return;
+    for (const candidate of drainIceCandidates(pendingIceCandidatesRef.current, peerId)) {
+      try {
+        await connection.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (error) {
+        console.warn("[VybeChat] candidate ICE pendente recusado", { peerId, error });
+      }
+    }
+  };
+
   const createPeer = async (peerId: string, shouldOffer = false) => {
     const existing = peerConnectionsRef.current.get(peerId);
     if (existing) return existing;
@@ -105,8 +118,12 @@ export default function CloudflareHome() {
       if (event.candidate && activeCallRef.current) socketRef.current.emit("call:ice", { to: peerId, channelId: activeCallRef.current, candidate: event.candidate });
     };
     connection.ontrack = event => {
-      const [stream] = event.streams;
-      if (stream) setRemoteStreams(current => [...current.filter(item => item.socketId !== peerId), { socketId: peerId, stream }]);
+      setRemoteStreams(current => {
+        const existing = current.find(item => item.socketId === peerId);
+        const stream = event.streams[0] ?? existing?.stream ?? new MediaStream();
+        if (!stream.getTracks().some(track => track.id === event.track.id)) stream.addTrack(event.track);
+        return [...current.filter(item => item.socketId !== peerId), { socketId: peerId, stream }];
+      });
     };
     connection.onconnectionstatechange = () => {
       if (connection.connectionState !== "failed" || !activeCallRef.current) return;
@@ -165,19 +182,35 @@ export default function CloudflareHome() {
       if (user) setCallPeers(current => ({ ...current, [from]: { socketId: from, name: user.name } }));
       const peer = await createPeer(from);
       await peer.setRemoteDescription(new RTCSessionDescription(offer));
+      await flushPendingIceCandidates(from, peer);
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
       socket.emit("call:answer", { to: from, channelId, answer });
     });
     socket.on("call:answer", async ({ from, channelId, answer }: { from: string; channelId: number; answer: RTCSessionDescriptionInit }) => {
-      if (channelId === activeCallRef.current) await peerConnectionsRef.current.get(from)?.setRemoteDescription(new RTCSessionDescription(answer));
+      if (channelId !== activeCallRef.current) return;
+      const peer = peerConnectionsRef.current.get(from);
+      if (!peer) return;
+      await peer.setRemoteDescription(new RTCSessionDescription(answer));
+      await flushPendingIceCandidates(from, peer);
     });
     socket.on("call:ice", async ({ from, channelId, candidate }: { from: string; channelId: number; candidate: RTCIceCandidateInit }) => {
-      if (channelId === activeCallRef.current) await peerConnectionsRef.current.get(from)?.addIceCandidate(new RTCIceCandidate(candidate));
+      if (channelId !== activeCallRef.current) return;
+      const peer = await createPeer(from);
+      if (!peer.remoteDescription) {
+        queueIceCandidate(pendingIceCandidatesRef.current, from, candidate);
+        return;
+      }
+      try {
+        await peer.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (error) {
+        console.warn("[VybeChat] candidate ICE recusado", { peerId: from, error });
+      }
     });
     socket.on("call:peer-left", ({ socketId }: { socketId: string }) => {
       peerConnectionsRef.current.get(socketId)?.close();
       peerConnectionsRef.current.delete(socketId);
+      pendingIceCandidatesRef.current.delete(socketId);
       setRemoteStreams(current => current.filter(item => item.socketId !== socketId));
       setCallPeers(current => {
         const next = { ...current };
@@ -329,6 +362,7 @@ export default function CloudflareHome() {
     if (activeCallRef.current) socketRef.current.emit("call:leave", { channelId: activeCallRef.current });
     peerConnectionsRef.current.forEach(peer => peer.close());
     peerConnectionsRef.current.clear();
+    pendingIceCandidatesRef.current.clear();
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     screenStream?.getTracks().forEach(track => track.stop());
     localStreamRef.current = null;
@@ -423,6 +457,9 @@ export default function CloudflareHome() {
       setScreenSharer(profile?.name ?? "Você");
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: true });
       track.onended = () => {
+        const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
+        peerConnectionsRef.current.forEach(peer => { void peer.getSenders().find(sender => sender.track?.kind === "video")?.replaceTrack(cameraTrack); });
+        if (activeCallRef.current) socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
         setScreenStream(null);
         setScreenSharer(null);
       };

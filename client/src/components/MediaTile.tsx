@@ -46,7 +46,11 @@ export function MediaTile({
   useEffect(() => {
     if (!audioRef.current) return;
     audioRef.current.srcObject = stream;
-  }, [stream]);
+    if (!isLocal && stream) {
+      const playback = audioRef.current.play();
+      if (playback && typeof playback.catch === "function") void playback.catch(() => undefined);
+    }
+  }, [isLocal, stream]);
 
   useEffect(() => {
     if (!videoRef.current) return;
