@@ -70,4 +70,24 @@ describe("VybeChatRoom collaboration integration", () => {
     expect(await storage.get("role:lead@vybe.com")).toBe("admin");
     expect(reconnected.deserializeAttachment().role).toBe("admin");
   });
+
+  it("persists direct messages, emits them to the recipient and clears the local unread counter", async () => {
+    const { room, storage, admin, member } = setup();
+    await room.handleEvent(admin, "direct:new", { toUserId: "member@vybe.com", toName: "Member", content: "Pode revisar a entrega?" });
+    await room.handleEvent(member, "direct:list", {});
+    await room.handleEvent(member, "direct:history", { peerUserId: "gestaovybe@gmail.com" });
+    await room.handleEvent(member, "direct:read", { peerUserId: "gestaovybe@gmail.com" });
+    const index = await storage.get("direct:index:member@vybe.com") as Array<{ unreadCount: number }>;
+    expect(index[0]?.unreadCount).toBe(0);
+    expect(packets(member).some(packet => packet.type === "direct:new" && packet.payload.message.content === "Pode revisar a entrega?")).toBe(true);
+    expect(packets(member).some(packet => packet.type === "direct:history" && packet.payload.messages.length === 1)).toBe(true);
+  });
+
+  it("sincroniza o pedido de fala de um participante da sala", async () => {
+    const { room, member } = setup();
+    await room.handleEvent(member, "call:join", { channelId: 5 });
+    await room.handleEvent(member, "call:hand-raise", { channelId: 5, active: true });
+    const rooms = packets(member).filter(packet => packet.type === "voice:rooms").at(-1)?.payload;
+    expect(rooms[0]?.members[0]?.handRaised).toBe(true);
+  });
 });

@@ -7,6 +7,11 @@ export type CallMediaResult = {
 
 type MediaDevicesLike = Pick<MediaDevices, "getUserMedia">;
 
+export type CallDeviceSelection = {
+  audioInputId?: string;
+  videoInputId?: string;
+};
+
 export const CALL_AUDIO_CONSTRAINTS = {
   echoCancellation: true,
   noiseSuppression: true,
@@ -21,12 +26,23 @@ export const CALL_VIDEO_CONSTRAINTS = {
   facingMode: "user",
 };
 
-export async function getCallMedia(mediaDevices: MediaDevicesLike): Promise<CallMediaResult> {
+export function getCallConstraints(selection: CallDeviceSelection = {}) {
+  const audio = selection.audioInputId
+    ? { ...CALL_AUDIO_CONSTRAINTS, deviceId: { exact: selection.audioInputId } }
+    : CALL_AUDIO_CONSTRAINTS;
+  const video = selection.videoInputId
+    ? { ...CALL_VIDEO_CONSTRAINTS, deviceId: { exact: selection.videoInputId } }
+    : CALL_VIDEO_CONSTRAINTS;
+  return { audio, video };
+}
+
+export async function getCallMedia(mediaDevices: MediaDevicesLike, selection: CallDeviceSelection = {}): Promise<CallMediaResult> {
+  const constraints = getCallConstraints(selection);
   try {
-    const stream = await mediaDevices.getUserMedia({ video: CALL_VIDEO_CONSTRAINTS, audio: CALL_AUDIO_CONSTRAINTS });
+    const stream = await mediaDevices.getUserMedia({ video: constraints.video, audio: constraints.audio });
     return { stream, mode: "camera-and-audio" };
   } catch {
-    const stream = await mediaDevices.getUserMedia({ video: false, audio: CALL_AUDIO_CONSTRAINTS });
+    const stream = await mediaDevices.getUserMedia({ video: false, audio: constraints.audio });
     return { stream, mode: "audio-only" };
   }
 }

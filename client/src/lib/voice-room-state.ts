@@ -5,6 +5,7 @@ export type VoiceRoomMember = {
   status: "online" | "away" | "offline";
   isMuted?: boolean;
   isSpeaking?: boolean;
+  handRaised?: boolean;
 };
 
 export type VoiceRoom = {

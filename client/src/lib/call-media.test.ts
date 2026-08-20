@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CALL_AUDIO_CONSTRAINTS, CALL_VIDEO_CONSTRAINTS, getCallMedia, getCallMediaErrorMessage } from "./call-media";
+import { CALL_AUDIO_CONSTRAINTS, CALL_VIDEO_CONSTRAINTS, getCallConstraints, getCallMedia, getCallMediaErrorMessage } from "./call-media";
 
 describe("call media acquisition", () => {
   it("falls back to audio-only when camera and microphone together are unavailable", async () => {
@@ -16,6 +16,13 @@ describe("call media acquisition", () => {
 
   it("solicita cancelamento de eco, supressão de ruído e ganho automático", () => {
     expect(CALL_AUDIO_CONSTRAINTS).toMatchObject({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 });
+  });
+
+  it("aplica os dispositivos escolhidos sem remover as proteções de áudio", () => {
+    expect(getCallConstraints({ audioInputId: "microfone-vybe", videoInputId: "camera-vybe" })).toEqual({
+      audio: expect.objectContaining({ deviceId: { exact: "microfone-vybe" }, echoCancellation: true }),
+      video: expect.objectContaining({ deviceId: { exact: "camera-vybe" }, width: { ideal: 1280 } }),
+    });
   });
 
   it("provides specific recovery guidance for common microphone failures", () => {

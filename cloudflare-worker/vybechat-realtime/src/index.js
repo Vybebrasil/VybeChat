@@ -20,6 +20,18 @@ function messageKey(channelId) {
   return `messages:${channelId}`;
 }
 
+function directThreadId(firstUserId, secondUserId) {
+  return `direct:${[firstUserId, secondUserId].sort().join("|")}`;
+}
+
+function directMessagesKey(threadId) {
+  return `direct:messages:${threadId}`;
+}
+
+function directIndexKey(userId) {
+  return `direct:index:${userId}`;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -41,7 +53,7 @@ export class VybeChatRoom {
     const [client, server] = Object.values(pair);
     server.serializeAttachment({
       socketId: crypto.randomUUID(), userId: null, name: "Visitante", status: "offline", statusMessage: "", role: "member",
-      callChannelId: null, isMuted: false, isSpeaking: false,
+      callChannelId: null, isMuted: false, isSpeaking: false, handRaised: false,
     });
     this.ctx.acceptWebSocket(server);
     return new Response(null, { status: 101, webSocket: client });
@@ -94,7 +106,7 @@ export class VybeChatRoom {
       const state = this.getState(socket);
       if (!state?.callChannelId) continue;
       const members = rooms.get(state.callChannelId) ?? [];
-      members.push({ socketId: state.socketId, userId: state.userId, name: state.name, status: state.status, isMuted: state.isMuted, isSpeaking: state.isSpeaking });
+      members.push({ socketId: state.socketId, userId: state.userId, name: state.name, status: state.status, isMuted: state.isMuted, isSpeaking: state.isSpeaking, handRaised: Boolean(state.handRaised) });
       rooms.set(state.callChannelId, members);
     }
     return Array.from(rooms.entries()).map(([channelId, members]) => ({ channelId, members }));
@@ -125,6 +137,14 @@ export class VybeChatRoom {
 
   async putHistory(channelId, history) {
     await this.ctx.storage.put(messageKey(channelId), history.slice(-200));
+  }
+
+  async getDirectIndex(userId) {
+    return (await this.ctx.storage.get(directIndexKey(userId))) ?? [];
+  }
+
+  async putDirectIndex(userId, threads) {
+    await this.ctx.storage.put(directIndexKey(userId), threads.sort((first, second) => second.updatedAt.localeCompare(first.updatedAt)).slice(0, 80));
   }
 
   async handleEvent(socket, type, payload) {
@@ -169,6 +189,54 @@ export class VybeChatRoom {
       const permissions = normalizePermissions(payload);
       await this.ctx.storage.put(`permissions:${payload.channelId}`, permissions);
       this.broadcast("channel:permissions", { channelId: payload.channelId, permissions });
+      return;
+    }
+
+    if (type === "direct:list" && state.userId) {
+      socket.send(json("direct:list", { threads: await this.getDirectIndex(state.userId) }));
+      return;
+    }
+
+    if (type === "direct:history" && state.userId && typeof payload.peerUserId === "string" && payload.peerUserId) {
+      const threadId = directThreadId(state.userId, payload.peerUserId);
+      const messages = (await this.ctx.storage.get(directMessagesKey(threadId))) ?? [];
+      socket.send(json("direct:history", { threadId, peerUserId: payload.peerUserId, messages }));
+      return;
+    }
+
+    if (type === "direct:new" && state.userId && typeof payload.toUserId === "string" && typeof payload.content === "string") {
+      const toUserId = payload.toUserId;
+      const content = payload.content.trim().slice(0, 4000);
+      if (!toUserId || toUserId === state.userId || !content) return;
+      const target = this.findUserSocket(toUserId);
+      const targetState = target ? this.getState(target) : null;
+      const targetName = String(payload.toName ?? targetState?.name ?? "Integrante Vybe").slice(0, 80);
+      const threadId = directThreadId(state.userId, toUserId);
+      const history = (await this.ctx.storage.get(directMessagesKey(threadId))) ?? [];
+      const message = { id: crypto.randomUUID(), threadId, userId: state.userId, authorName: state.name, toUserId, content, createdAt: new Date().toISOString(), readBy: [state.userId] };
+      await this.ctx.storage.put(directMessagesKey(threadId), [...history, message].slice(-200));
+      const senderThread = { id: threadId, peerUserId: toUserId, peerName: targetName, lastMessage: content, updatedAt: message.createdAt, unreadCount: 0 };
+      const recipientThread = { id: threadId, peerUserId: state.userId, peerName: state.name, lastMessage: content, updatedAt: message.createdAt, unreadCount: 0 };
+      const senderIndex = await this.getDirectIndex(state.userId);
+      await this.putDirectIndex(state.userId, [...senderIndex.filter(item => item.id !== threadId), senderThread]);
+      const recipientIndex = await this.getDirectIndex(toUserId);
+      const previousRecipientThread = recipientIndex.find(item => item.id === threadId);
+      const unreadCount = (previousRecipientThread?.unreadCount ?? 0) + 1;
+      const recipientUpdate = { ...recipientThread, unreadCount };
+      await this.putDirectIndex(toUserId, [...recipientIndex.filter(item => item.id !== threadId), recipientUpdate]);
+      socket.send(json("direct:new", { thread: senderThread, message }));
+      if (target) target.send(json("direct:new", { thread: recipientUpdate, message }));
+      return;
+    }
+
+    if (type === "direct:read" && state.userId && typeof payload.peerUserId === "string" && payload.peerUserId) {
+      const threadId = directThreadId(state.userId, payload.peerUserId);
+      const index = await this.getDirectIndex(state.userId);
+      const thread = index.find(item => item.id === threadId);
+      if (!thread) return;
+      const updated = { ...thread, unreadCount: 0 };
+      await this.putDirectIndex(state.userId, [...index.filter(item => item.id !== threadId), updated]);
+      socket.send(json("direct:read", { thread: updated }));
       return;
     }
 
@@ -244,7 +312,7 @@ export class VybeChatRoom {
     if (type === "call:join") {
       if (!validChannelId(payload.channelId)) return;
       this.leaveCall(socket);
-      const next = this.setState(socket, { callChannelId: payload.channelId, isMuted: false, isSpeaking: false });
+      const next = this.setState(socket, { callChannelId: payload.channelId, isMuted: false, isSpeaking: false, handRaised: false });
       socket.send(json("call:peers", { channelId: payload.channelId, peers: this.peers(payload.channelId, next.socketId) }));
       this.broadcast("call:peer-joined", { channelId: payload.channelId, peer: { socketId: next.socketId, userId: next.userId, name: next.name, status: next.status, isMuted: false, isSpeaking: false } }, socket);
       this.broadcast("voice:rooms", this.voiceRooms());
@@ -254,6 +322,11 @@ export class VybeChatRoom {
     if (type === "call:leave") { this.leaveCall(socket); return; }
     if (type === "call:audio-state" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
       this.setState(socket, { isMuted: Boolean(payload.isMuted), isSpeaking: Boolean(payload.isMuted) ? false : Boolean(payload.isSpeaking) });
+      this.broadcast("voice:rooms", this.voiceRooms());
+      return;
+    }
+    if (type === "call:hand-raise" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
+      this.setState(socket, { handRaised: Boolean(payload.active) });
       this.broadcast("voice:rooms", this.voiceRooms());
       return;
     }

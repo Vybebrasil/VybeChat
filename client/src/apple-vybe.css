@@ -57,6 +57,12 @@ aside.cyber-panel { width: 260px !important; background: rgba(16,16,18,.72) !imp
 .cyber-grid .w-60 > p { color: #898990 !important; }
 .modern-central-trigger { border: 1px solid var(--apple-line) !important; border-radius: 14px !important; background: rgba(24,24,27,.86) !important; color: var(--apple-text) !important; box-shadow: 0 16px 30px rgba(0,0,0,.2) !important; }
 .modern-collaboration-drawer { border-color: var(--apple-line) !important; background: rgba(18,18,21,.96) !important; backdrop-filter: blur(30px); }
+.vybe-direct-drawer, .vybe-preflight { border-color: var(--apple-line) !important; background: rgba(18,18,21,.97) !important; box-shadow: -26px 0 70px rgba(0,0,0,.34), inset 1px 0 rgba(255,255,255,.035) !important; }
+.vybe-direct-drawer { animation: vybe-slide-in .22s cubic-bezier(.23,1,.32,1); }
+.vybe-direct-drawer button, .vybe-preflight button { transition: transform .16s cubic-bezier(.23,1,.32,1), background .16s cubic-bezier(.23,1,.32,1), border-color .16s cubic-bezier(.23,1,.32,1); }
+.vybe-direct-drawer button:active, .vybe-preflight button:active { transform: scale(.97); }
+.vybe-direct-drawer input:focus, .vybe-preflight select:focus { border-color: rgba(255,138,0,.65) !important; box-shadow: 0 0 0 3px rgba(255,138,0,.1); }
+@keyframes vybe-slide-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 
 .voice-context-dock { border: 1px solid var(--apple-line) !important; border-radius: 16px !important; background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 14px 30px rgba(0,0,0,.14) !important; }
 .voice-context-dock > div:first-child > span { border-radius: 11px !important; background: linear-gradient(145deg, #ff9d0a, #ff7800) !important; color: white !important; box-shadow: 0 8px 20px rgba(255,126,0,.2); }
@@ -86,4 +92,6 @@ aside.cyber-panel { width: 260px !important; background: rgba(16,16,18,.72) !imp
   .cyber-grid .cyber-corner.relative.overflow-hidden > p:not(.cyber-label) { max-width: none !important; font-size: 17px !important; }
   .cyber-grid .cyber-corner.relative.overflow-hidden > div:last-child { display: none !important; }
   .cyber-grid .w-60 { display: none !important; }
+  .vybe-direct-drawer { max-width: none !important; padding: 16px !important; }
+  .vybe-direct-drawer > div { grid-template-columns: 112px minmax(0,1fr) !important; }
 }
