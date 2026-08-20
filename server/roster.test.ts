@@ -92,6 +92,24 @@ describe("roster do Monday", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("token-secreto");
   });
 
+  it("usa uma versão da API que o Monday ainda suporta", async () => {
+    const storage = new MemoryStorage();
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { users: [] } }) });
+    await loadRoster({ storage, token: "t", allowedIds: [], now: 1, fetchImpl });
+    const [, init] = fetchImpl.mock.calls[0];
+    const versao = (init.headers as Record<string, string>)["API-Version"];
+    // A 2024-10 que estava fixada aqui nem consta mais na lista de suportadas
+    // do Monday — a mais antiga é 2025-04 — e a consulta voltava recusada.
+    expect(versao >= "2025-04").toBe(true);
+  });
+
+  it("aceita sobrescrever a versão da API sem mexer no código", async () => {
+    const storage = new MemoryStorage();
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { users: [] } }) });
+    await loadRoster({ storage, token: "t", allowedIds: [], now: 1, fetchImpl, apiVersion: "2026-10" });
+    expect((fetchImpl.mock.calls[0][1].headers as Record<string, string>)["API-Version"]).toBe("2026-10");
+  });
+
   it("propaga o erro quando o Monday falha e não existe cache nenhum", async () => {
     const storage = new MemoryStorage();
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
