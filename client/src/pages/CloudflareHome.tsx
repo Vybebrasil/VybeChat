@@ -23,7 +23,7 @@ import { createSpeakingDetector } from "@/lib/speaking-detector";
 import { createNoiseGate, sensitivityToThreshold } from "@/lib/noise-gate";
 import { getIceServers } from "@/lib/ice-config";
 import { attachLocalMedia } from "@/lib/peer-media";
-import { getScreenConstraints, type ScreenQuality } from "@/lib/screen-share";
+import { getScreenConstraints, pickPreviewParticipant, type ScreenQuality } from "@/lib/screen-share";
 import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
@@ -99,6 +99,7 @@ export default function CloudflareHome() {
   const [cameraOn, setCameraOn] = useState(true);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [screenSharer, setScreenSharer] = useState<string | null>(null);
+  const [screenSharerId, setScreenSharerId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [callStageOpen, setCallStageOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -249,6 +250,29 @@ export default function CloudflareHome() {
     }
   };
 
+  /**
+   * Renegocia com um participante respeitando o controle de colisao de ofertas.
+   * Necessario ao comecar a compartilhar: a linha de video e criada junto com a
+   * conexao, mas nasce sem track, e a resposta do outro lado a fixa como "so
+   * recebo" — entao a tela saia de quem compartilha e nao tinha por onde entrar.
+   */
+  const renegociar = async (peerId: string, connection: RTCPeerConnection) => {
+    if (!activeCallRef.current) return;
+    const negotiation = negotiationRef.current.get(peerId);
+    if (!negotiation || negotiation.makingOffer || connection.signalingState !== "stable") return;
+    try {
+      negotiation.makingOffer = true;
+      const offer = await connection.createOffer();
+      if (connection.signalingState !== "stable") return;
+      await connection.setLocalDescription(offer);
+      socketRef.current.emit("call:offer", { to: peerId, channelId: activeCallRef.current, offer });
+    } catch (error) {
+      console.warn("[VybeChat] renegociacao falhou", { peerId, error });
+    } finally {
+      negotiation.makingOffer = false;
+    }
+  };
+
   const createPeer = async (peerId: string, shouldOffer = false) => {
     const existing = peerConnectionsRef.current.get(peerId);
     if (existing) return existing;
@@ -262,6 +286,14 @@ export default function CloudflareHome() {
       if (event.candidate && activeCallRef.current) socketRef.current.emit("call:ice", { to: peerId, channelId: activeCallRef.current, candidate: event.candidate });
     };
     connection.ontrack = event => {
+      // Um track recem-chegado nasce `muted` e so desmuta quando a midia comeca a
+      // fluir. A interface decide se ha video olhando `muted`, e essa mudanca nao
+      // gera render nenhum: a tela compartilhada chegava e ficava invisivel para
+      // sempre. Um toque no estado a cada mute/unmute resolve.
+      const redesenhar = () => setRemoteStreams(current => [...current]);
+      event.track.addEventListener("unmute", redesenhar);
+      event.track.addEventListener("mute", redesenhar);
+      event.track.addEventListener("ended", redesenhar);
       setRemoteStreams(current => {
         const existing = current.find(item => item.socketId === peerId);
         const stream = event.streams[0] ?? existing?.stream ?? new MediaStream();
@@ -437,8 +469,11 @@ export default function CloudflareHome() {
         return next;
       });
     });
-    socket.on("call:screen-share", ({ channelId, name }: { channelId: number; name: string | null }) => {
-      if (channelId === activeCallRef.current) setScreenSharer(name);
+    // Antes isto guardava o nome de quem compartilha e a interface comparava
+    // nomes. Dois "Ewerton" na sala, ou a propria pessoa com o mesmo nome de
+    // outra, e a tela era atribuida a quem nao era. O socketId e unico.
+    socket.on("call:screen-share", ({ channelId, socketId, name }: { channelId: number; socketId: string | null; name: string | null }) => {
+      if (channelId === activeCallRef.current) setScreenSharerId(socketId); setScreenSharer(name);
     });
     socket.on("realtime:error", ({ message, code }: { message: string; code?: string }) => {
       // O worker recusou o acesso: devolve a pessoa para a tela de entrada em vez
@@ -551,14 +586,17 @@ export default function CloudflareHome() {
         cameraOn: hasVideo,
         speaking: Boolean(member?.isSpeaking),
         handRaised: Boolean(member?.handRaised),
-        sharingScreen: screenSharer === label,
-        accent: screenSharer === label,
+        sharingScreen: screenSharerId === remoteStream.socketId,
+        accent: screenSharerId === remoteStream.socketId,
         volume: remoteVolumes[remoteStream.socketId] ?? 100,
         onVolumeChange: (volume: number) => setRemoteVolumes(current => ({ ...current, [remoteStream.socketId]: volume })),
       };
     });
     return [...local, ...remote];
-  }, [activeRoomMembers, cameraOn, callPeers, handRaised, localStream, microphoneOn, profile, remoteStreams, remoteVolumes, screenSharer, screenStream]);
+  }, [activeRoomMembers, cameraOn, callPeers, handRaised, localStream, microphoneOn, profile, remoteStreams, remoteVolumes, screenSharerId, screenStream]);
+
+  // O painel reduzido mostra quem compartilha, nao voce mesmo.
+  const previewParticipant = useMemo(() => pickPreviewParticipant(stageParticipants), [stageParticipants]);
 
   const guardarPerfil = (next: Profile, codigo: string) => {
     setAuthError("");
@@ -650,6 +688,7 @@ export default function CloudflareHome() {
     setLocalStream(null);
     setScreenStream(null);
     setScreenSharer(null);
+    setScreenSharerId(null);
     setRemoteStreams([]);
     setCallPeers({});
     setCallStageOpen(false);
@@ -769,6 +808,7 @@ export default function CloudflareHome() {
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
       setScreenStream(null);
       setScreenSharer(null);
+    setScreenSharerId(null);
       return;
     }
     try {
@@ -779,10 +819,17 @@ export default function CloudflareHome() {
       // O som da tela vai por uma linha propria: substituir o microfone deixaria
       // a pessoa muda enquanto compartilha.
       const audioDaTela = stream.getAudioTracks()[0] ?? null;
-      await Promise.all(Array.from(videoSendersRef.current.entries()).map(async ([peerId, sender]) => {
+      await Promise.all(Array.from(peerConnectionsRef.current.entries()).map(async ([peerId, connection]) => {
         try {
-          await sender.replaceTrack(track);
+          await videoSendersRef.current.get(peerId)?.replaceTrack(track);
           await screenAudioSendersRef.current.get(peerId)?.replaceTrack(audioDaTela);
+          // A linha nasce sem track e o outro lado a responde como "so recebo".
+          // Sem reabrir os dois sentidos, a tela nunca chega la.
+          for (const transceiver of connection.getTransceivers()) {
+            const ehDaTela = transceiver.sender === videoSendersRef.current.get(peerId) || transceiver.sender === screenAudioSendersRef.current.get(peerId);
+            if (ehDaTela && transceiver.direction !== "sendrecv") transceiver.direction = "sendrecv";
+          }
+          await renegociar(peerId, connection);
         } catch (error) {
           // Um par com problema nao pode derrubar o compartilhamento dos outros.
           console.warn("[VybeChat] nao foi possivel enviar a tela para um participante", { peerId, error });
@@ -798,6 +845,7 @@ export default function CloudflareHome() {
         if (activeCallRef.current) socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
         setScreenStream(null);
         setScreenSharer(null);
+    setScreenSharerId(null);
       };
     } catch {
       setNotice("O compartilhamento de tela foi cancelado.");
@@ -825,5 +873,5 @@ export default function CloudflareHome() {
   return <main className="cyber-grid flex min-h-screen p-0 text-foreground md:p-3"><CallPreflightDialog gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} open={preflightChannelId !== null} roomName={findExternalChannel(preflightChannelId ?? 0)?.name ?? "sala"} onOpenChange={open => { if (!open) setPreflightChannelId(null); }} onJoin={selection => { const channelId = preflightChannelId; setPreflightChannelId(null); if (channelId !== null) void joinVoice(channelId, selection); }} /><DirectMessagesDrawer open={directOpen} profileId={profile.id} threads={directThreads} messages={directMessages} presence={presence} activeThreadId={activeDirectThreadId} onOpenChange={setDirectOpen} onOpenThread={openDirectMessage} onSend={sendDirectMessage} /><VybeCommandPalette channels={EXTERNAL_WORKSPACE.flatMap(category => category.channels)} members={presence.filter(member => member.userId !== profile.id)} onSelectChannel={selectChannel} onJoinVoice={prepareVoice} onOpenDirect={openDirectMessage} onOpenCentral={() => document.querySelector<HTMLButtonElement>(".modern-central-trigger")?.click()} /><NotificationControl preferences={notificationPreferences} onRequestPermission={() => { void requestPermission(); }} onToggleQuiet={toggleQuiet} /><DecisionsDrawer decisions={decisions} profileName={profile.name} onCreate={createDecision} onUpdate={updateDecision} /><section className="cyber-panel flex min-w-0 flex-1 min-h-screen overflow-hidden bg-[#0b0c10]/92 md:min-h-[calc(100vh-1.5rem)]">{mobileSidebarOpen && <button onClick={() => setMobileSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/75 md:hidden" aria-label="Fechar navegação" />}{sidebar}
     <section className="flex min-w-0 flex-1 flex-col"><header className="flex h-[64px] items-center gap-3 border-b border-orange-300/15 bg-black/20 px-4 sm:h-[76px] sm:px-6"><button onClick={() => setMobileSidebarOpen(true)} className="grid size-9 rounded-lg border border-orange-300/20 text-orange-200 md:hidden" aria-label="Abrir canais"><Menu className="size-4" /></button><div className="grid size-10 place-items-center rounded-xl border border-orange-300/25 bg-orange-400/10 text-orange-300"><Hash className="size-5" /></div><div className="min-w-0"><p className="cyber-label">Canal</p><h1 className="truncate font-sans text-sm font-semibold text-orange-50">{selectedChannel?.name}</h1></div>{activeCallChannelId && <button onClick={() => setCallStageOpen(true)} className="ml-auto rounded-xl border border-orange-300/35 bg-orange-400/10 px-3 py-2 text-xs font-semibold text-orange-100">Abrir chamada</button>}<span className={`${activeCallChannelId ? "hidden sm:flex" : "ml-auto flex"} items-center gap-2 rounded-full border border-orange-300/20 bg-orange-400/5 px-3 py-2 text-xs text-orange-200`}><span className="signal-pulse size-1.5 rounded-full bg-emerald-400" />{presence.length} online</span></header>
       <div className="flex min-h-0 flex-1"><section className="flex min-w-0 flex-1 flex-col"><div className="flex-1 overflow-y-auto p-4 sm:p-7"><div className="mx-auto max-w-4xl"><div className="mb-7 border-b border-orange-300/12 pb-7"><div className="grid size-14 place-items-center rounded-2xl border border-orange-300/25 bg-orange-400/10 text-orange-300"><Hash className="size-7" /></div><p className="cyber-label mt-5">Canal da equipe</p><h2 className="mt-1 font-sans text-3xl font-semibold tracking-tight text-orange-50">#{selectedChannel?.name}</h2><p className="mt-2 text-sm text-stone-400">Converse, compartilhe decisões e mantenha todo mundo no mesmo contexto.</p></div><div className="space-y-4">{channelMessages.length ? channelMessages.map(message => <article key={message.id} className="cyber-corner flex gap-3 border border-orange-300/10 bg-black/15 p-3"><Avatar className="size-9"><AvatarFallback className="rounded-xl border border-orange-300/20 bg-orange-400/10 text-xs text-orange-100">{initials(message.authorName)}</AvatarFallback></Avatar><div className="min-w-0"><p className="text-xs font-semibold text-orange-100">{message.authorName}</p><p className="mt-1 whitespace-pre-wrap break-words text-sm text-stone-300">{normalizeExternalMessage(message.content)}</p></div></article>) : <div className="cyber-corner relative overflow-hidden border border-orange-300/15 bg-black/20 p-6 sm:p-8"><div className="absolute right-5 top-4 text-5xl font-bold text-orange-400/10">V</div><p className="cyber-label">Ainda não há mensagens</p><p className="mt-3 max-w-sm text-sm leading-6 text-stone-400">Comece a conversa e mantenha a equipe alinhada neste canal.</p><div className="mt-6 flex gap-2 text-xs text-stone-400"><span>Canal privado</span><span>•</span><span>Atualizações em tempo real</span></div></div>}</div>{typingNames.length > 0 && <p className="mt-4 text-xs text-orange-300">{typingNames.join(", ")} digitando…</p>}{notice && <p className="mt-5 rounded-xl border-l-2 border-orange-400 bg-orange-400/8 p-3 text-xs text-orange-100">{notice}</p>}</div></div>{selectedChannel && (selectedChannel.type === "text" || activeCallChannelId === selectedChannelId) && <form onSubmit={sendMessage} className="mx-auto flex w-full max-w-4xl gap-2 px-4 pb-4 sm:px-7 sm:pb-6"><div className="min-w-0 flex-1">{threadParent && <p className="mb-1 truncate text-xs text-orange-300">Respondendo a {threadParent.authorName} · <button type="button" onClick={() => setThreadParent(null)} className="underline">cancelar</button></p>}<Textarea value={draft} onChange={event => { setDraft(event.target.value); socketRef.current.emit("typing", { channelId: selectedChannelId, active: Boolean(event.target.value.trim()) }); }} placeholder={`Mensagem para #${selectedChannel.name}`} className="min-h-12 resize-none rounded-xl border-orange-300/20 bg-black/40 text-orange-50 placeholder:text-stone-600 focus-visible:ring-orange-400" rows={1} /></div><Button size="icon" className="size-12 rounded-xl bg-orange-500 text-black hover:bg-orange-400"><SendHorizontal className="size-4" /></Button></form>}</section><aside className="hidden w-60 border-l border-orange-300/15 bg-black/15 p-5 xl:block"><p className="cyber-label">Online — {presence.length}</p><div className="mt-5 space-y-2">{presence.map(member => <div key={member.userId} className="flex items-center gap-2 py-1.5"><Avatar className="size-7"><AvatarFallback className="rounded-lg bg-orange-400/10 text-[10px] text-orange-100">{initials(member.name)}</AvatarFallback></Avatar><span className="truncate text-xs font-semibold text-stone-300">{member.name}</span><span className="ml-auto size-1.5 rounded-full bg-emerald-400" /></div>)}</div></aside></div></section>
-  </section><CommandTelemetryRail channelName={selectedChannel?.name ?? "geral"} onlineCount={presence.length} voiceCount={activeRoomMembers.length} messageCount={channelMessages.length} activeCall={Boolean(activeCallChannelId)} operators={presence} /><CollaborationDrawer messages={messages[selectedChannelId] ?? []} pinnedIds={pinnedIds[selectedChannelId] ?? []} presence={presence} profileId={profile.id} profileName={profile.name} status={status} statusMessage={statusMessage} searchQuery={searchQuery} searchResults={searchResults} activeCall={Boolean(activeCallChannelId)} pushToTalkEnabled={pushToTalkEnabled} pushToTalkKey={pushToTalkKey} isTransmitting={isTransmitting} canManage={currentRole === "admin"} readOnly={channelPermissions[selectedChannelId]?.readOnly ?? false} invitePolicy={channelPermissions[selectedChannelId]?.invitePolicy ?? "member"} onStatusChange={updateStatus} onSearch={searchMessages} onReact={reactToMessage} onPin={togglePin} onReply={message => { setThreadParent(message); setNotice(`Respondendo em thread a ${message.authorName}.`); }} onInvite={inviteToCall} onTogglePushToTalk={() => setPushToTalkEnabled(current => !current)} onPushToTalkKeyChange={setPushToTalkKey} onToggleReadOnly={toggleReadOnly} onSetRole={setMemberRole} onToggleInvitePolicy={toggleInvitePolicy} />{activeCallChannelId && <CallAudioSink streams={remoteStreams} volumes={remoteVolumes} onBlocked={blocked => setAudioBlocked(blocked)} />}{activeCallChannelId && audioBlocked && <button onClick={unblockAudio} className="fixed inset-x-0 top-3 z-[60] mx-auto flex w-[min(92vw,420px)] items-center justify-center gap-2 rounded-xl border border-orange-300/40 bg-orange-500 px-4 py-3 text-sm font-semibold text-black shadow-lg"><Volume2 className="size-4" />Toque para ouvir a chamada</button>}{activeCallChannelId && !callStageOpen && <div className="fixed bottom-[68px] right-4 z-20 w-[min(92vw,360px)]"><button onClick={() => setCallStageOpen(true)} className="cyber-panel cyber-corner w-full p-3 text-left"><span className="cyber-label flex items-center gap-2"><MonitorUp className="size-4" />Abrir palco</span><span className="mt-1 block text-[11px] text-stone-400">Equipe e conversa permanecem disponíveis</span>{stageParticipants[0] && <div className="mt-3 h-28 overflow-hidden border border-orange-300/20"><MediaTile {...stageParticipants[0]} className="h-full min-h-0 rounded-none" /></div>}</button></div>}{activeCallChannelId && callStageOpen && <CallStage roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"} participants={stageParticipants} microphoneOn={microphoneOn} cameraOn={cameraOn} sharingScreen={Boolean(screenStream)} handRaised={handRaised} diagnostics={peerAudioDiagnostics} gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} micLevel={micLevel} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onToggleHandRaise={toggleHandRaise} onLeave={leaveVoice} onMinimize={() => setCallStageOpen(false)} />}</main>;
+  </section><CommandTelemetryRail channelName={selectedChannel?.name ?? "geral"} onlineCount={presence.length} voiceCount={activeRoomMembers.length} messageCount={channelMessages.length} activeCall={Boolean(activeCallChannelId)} operators={presence} /><CollaborationDrawer messages={messages[selectedChannelId] ?? []} pinnedIds={pinnedIds[selectedChannelId] ?? []} presence={presence} profileId={profile.id} profileName={profile.name} status={status} statusMessage={statusMessage} searchQuery={searchQuery} searchResults={searchResults} activeCall={Boolean(activeCallChannelId)} pushToTalkEnabled={pushToTalkEnabled} pushToTalkKey={pushToTalkKey} isTransmitting={isTransmitting} canManage={currentRole === "admin"} readOnly={channelPermissions[selectedChannelId]?.readOnly ?? false} invitePolicy={channelPermissions[selectedChannelId]?.invitePolicy ?? "member"} onStatusChange={updateStatus} onSearch={searchMessages} onReact={reactToMessage} onPin={togglePin} onReply={message => { setThreadParent(message); setNotice(`Respondendo em thread a ${message.authorName}.`); }} onInvite={inviteToCall} onTogglePushToTalk={() => setPushToTalkEnabled(current => !current)} onPushToTalkKeyChange={setPushToTalkKey} onToggleReadOnly={toggleReadOnly} onSetRole={setMemberRole} onToggleInvitePolicy={toggleInvitePolicy} />{activeCallChannelId && <CallAudioSink streams={remoteStreams} volumes={remoteVolumes} onBlocked={blocked => setAudioBlocked(blocked)} />}{activeCallChannelId && audioBlocked && <button onClick={unblockAudio} className="fixed inset-x-0 top-3 z-[60] mx-auto flex w-[min(92vw,420px)] items-center justify-center gap-2 rounded-xl border border-orange-300/40 bg-orange-500 px-4 py-3 text-sm font-semibold text-black shadow-lg"><Volume2 className="size-4" />Toque para ouvir a chamada</button>}{activeCallChannelId && !callStageOpen && <div className="fixed bottom-[68px] right-4 z-20 w-[min(92vw,360px)]"><button onClick={() => setCallStageOpen(true)} className="cyber-panel cyber-corner w-full p-3 text-left"><span className="cyber-label flex items-center gap-2"><MonitorUp className="size-4" />Abrir palco</span><span className="mt-1 block text-[11px] text-stone-400">Equipe e conversa permanecem disponíveis</span>{previewParticipant && <div className="mt-3 h-28 overflow-hidden border border-orange-300/20"><MediaTile {...previewParticipant} className="h-full min-h-0 rounded-none" /></div>}</button></div>}{activeCallChannelId && callStageOpen && <CallStage roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"} participants={stageParticipants} microphoneOn={microphoneOn} cameraOn={cameraOn} sharingScreen={Boolean(screenStream)} handRaised={handRaised} diagnostics={peerAudioDiagnostics} gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} micLevel={micLevel} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onToggleHandRaise={toggleHandRaise} onLeave={leaveVoice} onMinimize={() => setCallStageOpen(false)} />}</main>;
 }
