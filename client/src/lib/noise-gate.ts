@@ -43,8 +43,16 @@ export function createNoiseGate({ stream, getThreshold, isEnabled, onChange }: G
   const track = stream.getAudioTracks()[0];
   if (!AudioContextImpl || !track) return null;
 
+  // O portão fecha o microfone com `enabled = false`, e um track desligado entrega
+  // silêncio para TODOS os consumidores — inclusive para o analisador. Medindo o
+  // próprio track que fechamos, o portão ficava surdo e nunca mais reabria: a
+  // pessoa emudecia no primeiro silêncio e assim continuava o resto da chamada.
+  //
+  // O clone tem `enabled` próprio: ele continua ouvindo o microfone enquanto o
+  // track transmitido está fechado.
+  const monitor = track.clone();
   const context = new AudioContextImpl();
-  const source = context.createMediaStreamSource(stream);
+  const source = context.createMediaStreamSource(new MediaStream([monitor]));
   const analyser = context.createAnalyser();
   analyser.fftSize = 512;
   source.connect(analyser);
@@ -76,6 +84,7 @@ export function createNoiseGate({ stream, getThreshold, isEnabled, onChange }: G
     window.clearInterval(timer);
     source.disconnect();
     analyser.disconnect();
+    monitor.stop();
     // Nunca deixar o microfone fechado ao desmontar.
     track.enabled = true;
     void context.close().catch(() => undefined);
