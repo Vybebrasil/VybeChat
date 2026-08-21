@@ -1,4 +1,5 @@
 import { getAudioLevel } from "./speaking-detector";
+import { METER_FLOOR_DB, sensitivityToDb, toDbfs, toMeterPercent } from "./mic-preview";
 
 /**
  * Portão de ruído: só deixa o microfone transmitir enquanto a pessoa fala.
@@ -13,21 +14,21 @@ import { getAudioLevel } from "./speaking-detector";
  * contínuo nos silêncios — que é a maior parte do tempo numa reunião.
  */
 
-/** Abaixo disto é silêncio. Mais alto = mais rígido (corta mais). */
-export const DEFAULT_GATE_THRESHOLD = 0.02;
+/** Abaixo disto é silêncio, em dBFS. Mais alto = mais rígido (corta mais). */
+export const DEFAULT_GATE_THRESHOLD_DB = -50;
 /** Quanto tempo continua aberto depois da última fala, para não cortar sílabas. */
 export const GATE_HOLD_MS = 900;
 const SAMPLE_INTERVAL_MS = 80;
 
+/** `level` e `threshold` em dBFS, a mesma escala mostrada na barra. */
 export function shouldGateOpen(options: { level: number; threshold: number; lastVoiceAt: number; now: number }) {
   if (options.level >= options.threshold) return true;
   return options.now - options.lastVoiceAt < GATE_HOLD_MS;
 }
 
-/** 0 a 100 na interface vira um limiar utilizável. 0 desliga o portão. */
+/** 0 a 100 na interface vira o limiar em dB. 0 desliga o portão. */
 export function sensitivityToThreshold(sensitivity: number) {
-  const clamped = Math.min(100, Math.max(0, sensitivity));
-  return (clamped / 100) * 0.12;
+  return sensitivityToDb(sensitivity);
 }
 
 type GateOptions = {
@@ -36,9 +37,11 @@ type GateOptions = {
   /** Só age quando o microfone deveria estar ligado; respeita mute e push-to-talk. */
   isEnabled: () => boolean;
   onChange?: (open: boolean) => void;
+  /** Nível atual em 0–100, para alimentar a barra durante a chamada. */
+  onLevel?: (percent: number) => void;
 };
 
-export function createNoiseGate({ stream, getThreshold, isEnabled, onChange }: GateOptions) {
+export function createNoiseGate({ stream, getThreshold, isEnabled, onChange, onLevel }: GateOptions) {
   const AudioContextImpl = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   const track = stream.getAudioTracks()[0];
   if (!AudioContextImpl || !track) return null;
@@ -64,13 +67,18 @@ export function createNoiseGate({ stream, getThreshold, isEnabled, onChange }: G
   const timer = window.setInterval(() => {
     if (!isEnabled()) return;
     const threshold = getThreshold();
-    // Limiar zero significa portão desligado: nunca fecha o microfone.
-    if (threshold <= 0) {
+    // No piso da escala o portão está desligado: nunca fecha o microfone, mas a
+    // barra continua viva para a pessoa enxergar o próprio nível.
+    if (threshold <= METER_FLOOR_DB) {
+      analyser.getByteTimeDomainData(samples);
+      onLevel?.(toMeterPercent(getAudioLevel(samples)));
       if (!open) { open = true; track.enabled = true; onChange?.(true); }
       return;
     }
     analyser.getByteTimeDomainData(samples);
-    const level = getAudioLevel(samples);
+    const rms = getAudioLevel(samples);
+    onLevel?.(toMeterPercent(rms));
+    const level = toDbfs(rms);
     const now = Date.now();
     if (level >= threshold) lastVoiceAt = now;
     const next = shouldGateOpen({ level, threshold, lastVoiceAt, now });

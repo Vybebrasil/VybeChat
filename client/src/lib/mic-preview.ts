@@ -7,17 +7,30 @@
  * deixar a pessoa se ouvir antes de entrar.
  */
 
-/** Topo da escala, igual ao usado por `sensitivityToThreshold`. */
-export const METER_FULL_SCALE = 0.12;
-
 /**
- * Converte o nível medido (RMS, 0 a 1) para a mesma escala 0–100 do controle de
- * sensibilidade. É isso que torna os dois comparáveis: se o medidor marca 30 e o
- * corte está em 16, sua voz passa.
+ * Faixa da barra, em decibéis. Voz humana é logarítmica: numa escala linear a
+ * fala normal mal saía do canto e a barra parecia morta. O Discord usa decibéis
+ * justamente por isso, e -60 dB a 0 dB é a faixa que deixa sala silenciosa perto
+ * do zero e fala normal em torno da metade.
  */
+export const METER_FLOOR_DB = -60;
+const SILENCIO_RMS = 1e-5;
+
+export function toDbfs(rms: number) {
+  if (!Number.isFinite(rms) || rms <= SILENCIO_RMS) return METER_FLOOR_DB;
+  return Math.max(METER_FLOOR_DB, Math.min(0, 20 * Math.log10(rms)));
+}
+
+/** Nível medido (RMS) vira a mesma escala 0–100 usada pelo controle de corte. */
 export function toMeterPercent(rms: number) {
-  if (!Number.isFinite(rms) || rms <= 0) return 0;
-  return Math.min(100, Math.round((rms / METER_FULL_SCALE) * 100));
+  const db = toDbfs(rms);
+  return Math.round(((db - METER_FLOOR_DB) / -METER_FLOOR_DB) * 100);
+}
+
+/** Caminho inverso: a posição do controle vira o limiar em dB. */
+export function sensitivityToDb(sensitivity: number) {
+  const clamped = Math.min(100, Math.max(0, sensitivity));
+  return METER_FLOOR_DB + (clamped / 100) * -METER_FLOOR_DB;
 }
 
 /** A voz passa do corte? Mesma comparação que o portão faz na chamada. */
