@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getScreenConstraints, resolveStageFocus, SCREEN_QUALITY_HINT, SCREEN_QUALITY_LABEL } from "./screen-share";
+import { getScreenConstraints, pickPreviewParticipant, resolveStageFocus, SCREEN_QUALITY_HINT, SCREEN_QUALITY_LABEL } from "./screen-share";
 
 describe("qualidade do compartilhamento", () => {
   it("fluida prioriza quadros, para vídeo não travar", () => {
@@ -47,5 +47,34 @@ describe("quem ocupa o centro do palco", () => {
     const depois = resolveStageFocus({ pinnedId: null, sharingId: null });
     expect(durante).toBe("vinicius");
     expect(depois).toBeNull();
+  });
+});
+
+describe("quem aparece no painel reduzido", () => {
+  const eu = { id: "local", isLocal: true };
+  const outro = { id: "vinicius" };
+  const compartilhando = { id: "jady", sharingScreen: true };
+
+  it("quem compartilha a tela vem primeiro", () => {
+    // O bug: o painel mostrava sempre o primeiro participante, que é você. Com a
+    // câmera desligada aparecia só o seu avatar, e a tela compartilhada chegava
+    // sem ser exibida em lugar nenhum.
+    expect(pickPreviewParticipant([eu, outro, compartilhando])?.id).toBe("jady");
+  });
+
+  it("sem ninguém compartilhando, mostra outra pessoa e não você", () => {
+    expect(pickPreviewParticipant([eu, outro])?.id).toBe("vinicius");
+  });
+
+  it("sozinho na sala, mostra você mesmo", () => {
+    expect(pickPreviewParticipant([eu])?.id).toBe("local");
+  });
+
+  it("sala vazia não quebra", () => {
+    expect(pickPreviewParticipant([])).toBeNull();
+  });
+
+  it("se só você compartilha, aparece a sua própria tela", () => {
+    expect(pickPreviewParticipant([{ id: "local", isLocal: true, sharingScreen: true }])?.id).toBe("local");
   });
 });

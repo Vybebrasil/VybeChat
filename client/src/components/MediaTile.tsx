@@ -39,8 +39,12 @@ export function MediaTile({
 
   useEffect(() => {
     if (!videoRef.current) return;
-    videoRef.current.srcObject = stream;
-  }, [stream]);
+    // `cameraOn` entra nas dependencias porque o <video> so existe quando ela e
+    // verdadeira. Sem isso, o efeito rodava antes do elemento aparecer, saia
+    // cedo, e nunca mais rodava — a tela compartilhada chegava e o elemento
+    // ficava sem fonte, mostrando nada.
+    if (videoRef.current.srcObject !== stream) videoRef.current.srcObject = stream;
+  }, [stream, cameraOn]);
 
   return (
     <article onClick={onSelect} className={`relative overflow-hidden rounded-2xl border bg-[#0b0a08] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-orange-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-orange-400/80 shadow-[0_0_28px_rgba(255,126,18,.26)]" : "border-orange-200/15"} ${className}`}>
