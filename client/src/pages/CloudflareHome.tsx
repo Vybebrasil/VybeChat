@@ -27,6 +27,7 @@ import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIc
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
 import { toProfileId, type TeamMember } from "@/lib/team-roster";
+import { bumpUnread, clearUnread, mentionAliases, mentionsSomeone, totalUnread, type UnreadMap } from "@/lib/unread";
 import { summarizePeerAudioStats, type PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 import { getRealtimeSocket } from "@/lib/realtime";
 import { useVybeNotifications } from "@/lib/use-vybe-notifications";
@@ -88,6 +89,7 @@ export default function CloudflareHome() {
   // pessoa simplesmente nao ouvia ninguem, sem nenhuma pista do motivo.
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
+  const [unread, setUnread] = useState<UnreadMap>({});
   const [microphoneOn, setMicrophoneOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -151,6 +153,8 @@ export default function CloudflareHome() {
   // depois de parar um compartilhamento — e caiamos numa renegociacao no meio
   // da chamada, que era o que derrubava a voz.
   const videoSendersRef = useRef(new Map<string, RTCRtpSender>());
+  // Linha separada para o som da tela, para nao disputar com o microfone.
+  const screenAudioSendersRef = useRef(new Map<string, RTCRtpSender>());
   const iceServersRef = useRef<RTCIceServer[]>(getIceServers());
   // Lido dentro do efeito de sockets sem entrar nas dependencias: antes trocar de
   // canal de texto durante a chamada re-registrava todos os handlers.
@@ -161,6 +165,13 @@ export default function CloudflareHome() {
 
   useEffect(() => { selectedChannelIdRef.current = selectedChannelId; }, [selectedChannelId]);
   useEffect(() => { microphoneOnRef.current = microphoneOn; }, [microphoneOn]);
+
+  useEffect(() => {
+    // Contador no titulo da aba: com o VybeChat em segundo plano, e o unico
+    // lugar onde a pessoa percebe que chegou mensagem.
+    const total = totalUnread(unread);
+    document.title = total > 0 ? `(${total}) VybeChat` : "VybeChat — Central de comunicação";
+  }, [unread]);
   useEffect(() => { pushToTalkRef.current = pushToTalkEnabled; }, [pushToTalkEnabled]);
   useEffect(() => {
     gateSensitivityRef.current = gateSensitivity;
@@ -236,8 +247,9 @@ export default function CloudflareHome() {
     const connection = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peerConnectionsRef.current.set(peerId, connection);
     negotiationRef.current.set(peerId, { makingOffer: false, ignoreOffer: false });
-    const videoSender = attachLocalMedia(connection, localStreamRef.current);
-    if (videoSender) videoSendersRef.current.set(peerId, videoSender as RTCRtpSender);
+    const senders = attachLocalMedia(connection, localStreamRef.current);
+    if (senders.video) videoSendersRef.current.set(peerId, senders.video as RTCRtpSender);
+    if (senders.screenAudio) screenAudioSendersRef.current.set(peerId, senders.screenAudio as RTCRtpSender);
     connection.onicecandidate = event => {
       if (event.candidate && activeCallRef.current) socketRef.current.emit("call:ice", { to: peerId, channelId: activeCallRef.current, candidate: event.candidate });
     };
@@ -300,8 +312,17 @@ export default function CloudflareHome() {
     socket.on("voice:rooms", (rooms: VoiceRoom[]) => setVoiceRooms(Object.fromEntries(rooms.map(room => [room.channelId, room.members]))));
     socket.on("message:history", ({ channelId, messages: history }: { channelId: number; messages: ExternalMessage[] }) => setMessages(current => ({ ...current, [channelId]: history })));
     socket.on("message:new", ({ channelId, message }: { channelId: number; message: ExternalMessage }) => {
+      setUnread(atual => bumpUnread({
+        unread: atual,
+        channelId,
+        activeChannelId: selectedChannelIdRef.current,
+        fromSelf: message.userId === profile.id,
+        mentioned: mentionsSomeone(message.content, mentionAliases(profile.name)),
+      }));
       setMessages(current => ({ ...current, [channelId]: [...(current[channelId] ?? []).filter(item => item.id !== message.id), message] }));
-      if (message.userId !== profile.id && message.content.toLocaleLowerCase().includes(`@${profile.name.toLocaleLowerCase()}`)) {
+      // A checagem anterior exigia o nome inteiro no texto: com nomes vindos do
+      // Monday isso virava "@paulo martins", e a mencao nunca disparava.
+      if (message.userId !== profile.id && mentionsSomeone(message.content, mentionAliases(profile.name))) {
         const channelName = findExternalChannel(channelId)?.name ?? "canal";
         setNotice(`${message.authorName} mencionou você em #${channelName}.`);
         notify(`Menção em #${channelName}`, `${message.authorName}: ${message.content.slice(0, 110)}`);
@@ -399,6 +420,7 @@ export default function CloudflareHome() {
       pendingIceCandidatesRef.current.delete(socketId);
       negotiationRef.current.delete(socketId);
       videoSendersRef.current.delete(socketId);
+      screenAudioSendersRef.current.delete(socketId);
       clearRestartTimer(socketId);
       setRemoteStreams(current => current.filter(item => item.socketId !== socketId));
       setCallPeers(current => {
@@ -551,6 +573,7 @@ export default function CloudflareHome() {
 
   const selectChannel = (channelId: number) => {
     setSelectedChannelId(channelId);
+    setUnread(atual => clearUnread(atual, channelId));
     setMobileSidebarOpen(false);
   };
 
@@ -609,6 +632,7 @@ export default function CloudflareHome() {
     peerConnectionsRef.current.clear();
     pendingIceCandidatesRef.current.clear();
     videoSendersRef.current.clear();
+    screenAudioSendersRef.current.clear();
     negotiationRef.current.clear();
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     screenStream?.getTracks().forEach(track => track.stop());
@@ -633,7 +657,9 @@ export default function CloudflareHome() {
       activeCallRef.current = channelId;
       setLocalStream(stream);
       setActiveCallChannelId(channelId);
-      setSelectedChannelId(channelId);
+      // Entrar numa sala de voz nao troca o canal de texto: antes a conversa
+      // aberta era substituida por um "#sala-geral" vazio, e a pessoa perdia de
+      // vista o canal onde estava lendo.
       const somenteEscuta = mode === "listen-only";
       setMicrophoneOn(!somenteEscuta);
       // Entrar numa sala nunca liga a camera: o getCallMedia pede so o
@@ -731,6 +757,7 @@ export default function CloudflareHome() {
       screenStream.getTracks().forEach(track => track.stop());
       const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
       videoSendersRef.current.forEach(sender => { void sender.replaceTrack(cameraTrack).catch(() => undefined); });
+      screenAudioSendersRef.current.forEach(sender => { void sender.replaceTrack(null).catch(() => undefined); });
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
       setScreenStream(null);
       setScreenSharer(null);
@@ -739,9 +766,13 @@ export default function CloudflareHome() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       const track = stream.getVideoTracks()[0];
+      // O som da tela vai por uma linha propria: substituir o microfone deixaria
+      // a pessoa muda enquanto compartilha.
+      const audioDaTela = stream.getAudioTracks()[0] ?? null;
       await Promise.all(Array.from(videoSendersRef.current.entries()).map(async ([peerId, sender]) => {
         try {
           await sender.replaceTrack(track);
+          await screenAudioSendersRef.current.get(peerId)?.replaceTrack(audioDaTela);
         } catch (error) {
           // Um par com problema nao pode derrubar o compartilhamento dos outros.
           console.warn("[VybeChat] nao foi possivel enviar a tela para um participante", { peerId, error });
@@ -753,6 +784,7 @@ export default function CloudflareHome() {
       track.onended = () => {
         const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
         videoSendersRef.current.forEach(sender => { void sender.replaceTrack(cameraTrack).catch(() => undefined); });
+        screenAudioSendersRef.current.forEach(sender => { void sender.replaceTrack(null).catch(() => undefined); });
         if (activeCallRef.current) socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
         setScreenStream(null);
         setScreenSharer(null);
@@ -774,7 +806,7 @@ export default function CloudflareHome() {
 
   const sidebar = <aside className={`${mobileSidebarOpen ? "fixed inset-y-0 left-0 z-40 flex w-[292px] shadow-2xl" : "hidden"} cyber-panel flex-col bg-[#0a0b0f]/98 md:relative md:flex md:w-[292px] md:shrink-0`}>
     <div className="border-b border-orange-300/15 px-5 py-5"><div className="flex items-start justify-between"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl border border-orange-300/45 bg-orange-400/10 text-sm font-extrabold text-orange-300">V</span><div><p className="cyber-label">Equipe Vybe</p><h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-orange-100">VybeChat</h2></div></div><button onClick={() => setMobileSidebarOpen(false)} className="grid size-8 rounded-lg border border-orange-300/15 text-orange-200 md:hidden" aria-label="Fechar canais"><X className="size-4" /></button></div><div className="mt-4 flex items-center gap-2 text-xs text-stone-400"><span className="size-1.5 rounded-full bg-emerald-400" />Todos os sistemas online</div></div>
-    <div className="flex-1 overflow-y-auto px-3 py-4"><CommandNavigation groups={EXTERNAL_WORKSPACE} selectedChannelId={selectedChannelId} voiceRooms={voiceRooms} onSelectText={selectChannel} onJoinVoice={prepareVoice} /></div>
+    <div className="flex-1 overflow-y-auto px-3 py-4"><CommandNavigation unread={unread} groups={EXTERNAL_WORKSPACE} selectedChannelId={selectedChannelId} voiceRooms={voiceRooms} onSelectText={selectChannel} onJoinVoice={prepareVoice} /></div>
     {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} micLevel={micLevel} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
     <div className="flex items-center gap-2 border-t border-orange-300/15 p-3"><Avatar className="size-9">{profile.photo ? <AvatarImage src={profile.photo} alt="" className="rounded-xl object-cover" /> : null}<AvatarFallback className="rounded-xl border border-orange-300/25 bg-orange-400/10 text-xs text-orange-100">{initials(profile.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-orange-50">{profile.name}</p><p className="text-[11px] text-emerald-400">Online</p></div><button onClick={() => { leaveVoice(); localStorage.removeItem(PROFILE_KEY); setProfile(null); }} aria-label="Sair"><LogOut className="size-4 text-stone-500" /></button></div>
   </aside>;

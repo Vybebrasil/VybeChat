@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadRoster, parseIdList, ROSTER_TTL_MS, selectTeam, toRosterEntry } from "../cloudflare-worker/vybechat-realtime/src/roster.js";
+import { loadRoster, orderTeam, parseIdList, ROSTER_TTL_MS, selectTeam, toRosterEntries, toRosterEntry } from "../cloudflare-worker/vybechat-realtime/src/roster.js";
 
 // Formato conferido contra o schema real do Monday: photo_url + status/is_deleted.
 const EQUIPE = [
@@ -162,5 +162,36 @@ describe("equipe configurada da Vybe", () => {
     expect(ids).not.toContain("104320606"); // Aquilane
     expect(ids).not.toContain("98079733"); // Ewerton Silva, cadastro duplicado
     expect(time).toHaveLength(10);
+  });
+});
+
+describe("mudar a equipe tem efeito na hora", () => {
+  it("incluir alguém na equipe não espera o cache vencer", async () => {
+    const storage = new MemoryStorage();
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { users: RESPOSTA_REAL } }) });
+
+    const semReriston = await loadRoster({ storage, token: "t", allowedIds: ["68035537"], now: 1000, fetchImpl });
+    expect(semReriston.team.map(p => p.id)).toEqual(["68035537"]);
+
+    // Mesmo cache, lista da equipe diferente: antes o cache guardava a equipe já
+    // filtrada, então quem entrasse depois só aparecia até 6 horas mais tarde.
+    const comReriston = await loadRoster({ storage, token: "t", allowedIds: ["68035537", "68036697"], now: 2000, fetchImpl });
+    expect(comReriston.source).toBe("cache");
+    expect(comReriston.team.map(p => p.id)).toEqual(["68035537", "68036697"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("cache antigo, no formato de equipe filtrada, continua servindo", async () => {
+    const storage = new MemoryStorage();
+    await storage.put("team:roster", { team: [{ id: "1", name: "Antigo", photo: "" }], fetchedAt: 1000 });
+    const resultado = await loadRoster({ storage, token: "t", allowedIds: [], now: 1500, fetchImpl: vi.fn() });
+    expect(resultado.team.map(p => p.name)).toEqual(["Antigo"]);
+  });
+
+  it("a equipe atual inclui Reriston, na ordem configurada", () => {
+    const ids = parseIdList("68035537,68036687,68035653,71130408,68997024,100482777,78158742,80146924,99331648,99331644,68036697");
+    const time = orderTeam(toRosterEntries(RESPOSTA_REAL), ids);
+    expect(time).toHaveLength(11);
+    expect(time.at(-1)?.name).toBe("Reriston Souza Silva");
   });
 });
