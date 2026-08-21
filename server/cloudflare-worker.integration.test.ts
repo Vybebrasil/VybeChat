@@ -198,6 +198,34 @@ describe("VybeChatRoom collaboration integration", () => {
     expect(await storage.get("pins:1")).toEqual([]);
   });
 
+  it("moderador silencia alguem para toda a sala", async () => {
+    const { room, admin, member } = setup();
+    admin.attachment.callChannelId = 5;
+    member.attachment.callChannelId = 5;
+    await room.handleEvent(admin, "call:mute", { channelId: 5, socketId: "member-socket" });
+    // O microfone fecha de verdade no aparelho da pessoa: so marcar como mudo
+    // para os outros deixaria ela falando sem saber que ninguem ouve.
+    expect(packets(member).find(p => p.type === "call:force-mute")).toMatchObject({ payload: { by: "Admin" } });
+    expect(member.deserializeAttachment().isMuted).toBe(true);
+  });
+
+  it("quem nao e moderador nao silencia ninguem", async () => {
+    const { room, admin, member } = setup();
+    admin.attachment.callChannelId = 5;
+    member.attachment.callChannelId = 5;
+    await room.handleEvent(member, "call:mute", { channelId: 5, socketId: "admin-socket" });
+    expect(admin.deserializeAttachment().isMuted).toBeFalsy();
+    expect(packets(member).at(-1)).toMatchObject({ type: "realtime:error" });
+  });
+
+  it("nao silencia quem esta em outra sala de voz", async () => {
+    const { room, admin, member } = setup();
+    admin.attachment.callChannelId = 5;
+    member.attachment.callChannelId = 6;
+    await room.handleEvent(admin, "call:mute", { channelId: 5, socketId: "member-socket" });
+    expect(member.deserializeAttachment().isMuted).toBeFalsy();
+  });
+
   it("persists direct messages, emits them to the recipient and clears the local unread counter", async () => {
     const { room, storage, admin, member } = setup();
     await room.handleEvent(admin, "direct:new", { toUserId: "member@vybe.com", toName: "Member", content: "Pode revisar a entrega?" });

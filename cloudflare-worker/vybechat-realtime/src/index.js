@@ -545,6 +545,24 @@ export class VybeChatRoom {
       return;
     }
 
+    if (type === "call:mute" && typeof payload.socketId === "string") {
+      // Quando o microfone de alguem esta estourando a reuniao, baixar o volume
+      // no proprio ouvido nao resolve para o resto da sala.
+      if (!canModerate(state.role)) {
+        return socket.send(json("realtime:error", { message: "Apenas moderadores podem silenciar alguém." }));
+      }
+      const alvo = this.findSocket(payload.socketId);
+      if (!alvo) return;
+      const alvoState = this.getState(alvo);
+      if (!alvoState?.callChannelId || alvoState.callChannelId !== state.callChannelId) return;
+      this.setState(alvo, { isMuted: true, isSpeaking: false });
+      // O aviso vai para a pessoa: o microfone dela fecha de verdade, em vez de
+      // so aparecer mudo para os outros enquanto ela segue falando.
+      alvo.send(json("call:force-mute", { channelId: alvoState.callChannelId, by: state.name }));
+      this.broadcast("voice:rooms", this.voiceRooms());
+      return;
+    }
+
     if (type === "call:leave") { this.leaveCall(socket); return; }
     if (type === "call:audio-state" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
       this.setState(socket, { isMuted: Boolean(payload.isMuted), isSpeaking: Boolean(payload.isMuted) ? false : Boolean(payload.isSpeaking) });
