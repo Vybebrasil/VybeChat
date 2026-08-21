@@ -24,6 +24,12 @@ type MinimalConnection = {
   addTransceiver: (kind: string, init?: RTCRtpTransceiverInit) => { sender: MinimalSender };
 };
 
+export type LocalSenders = {
+  video: MinimalSender | null;
+  /** Linha extra só para o áudio da tela compartilhada. */
+  screenAudio: MinimalSender | null;
+};
+
 export function attachLocalMedia(connection: MinimalConnection, stream: MediaStream | null) {
   const localTracks = stream ? stream.getTracks() : [];
   for (const track of localTracks) connection.addTrack(track, stream as MediaStream);
@@ -39,5 +45,11 @@ export function attachLocalMedia(connection: MinimalConnection, stream: MediaStr
     connection.addTransceiver("audio", { direction: "recvonly" as RTCRtpTransceiverDirection });
   }
 
-  return videoSender ?? null;
+  // Segunda linha de áudio, reservada ao som da tela compartilhada. Sem ela o
+  // áudio da aba não tinha por onde sair: era capturado e descartado, e quem
+  // compartilhava um vídeo chegava mudo do outro lado. Criada aqui pelo mesmo
+  // motivo da linha de vídeo — para depois ser só um replaceTrack, sem renegociar.
+  const screenAudioSender = connection.addTransceiver("audio", { direction: "sendrecv" as RTCRtpTransceiverDirection }).sender;
+
+  return { video: videoSender ?? null, screenAudio: screenAudioSender } satisfies LocalSenders;
 }

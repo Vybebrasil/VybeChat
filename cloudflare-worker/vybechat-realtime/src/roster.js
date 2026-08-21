@@ -43,10 +43,20 @@ export function toRosterEntry(user) {
   };
 }
 
-export function selectTeam(users, allowedIds) {
+/** Todo mundo ativo, sem filtrar por equipe: e isto que vai para o cache. */
+export function toRosterEntries(users) {
   const active = (Array.isArray(users) ? users : []).filter(user => user && user.status === "ACTIVE" && !user.is_deleted);
-  const entries = active.map(toRosterEntry).filter(entry => entry.id && entry.name);
-  if (!allowedIds.length) return entries.sort(byName);
+  return active.map(toRosterEntry).filter(entry => entry.id && entry.name);
+}
+
+export function selectTeam(users, allowedIds) {
+  const entries = toRosterEntries(users);
+  return orderTeam(entries, allowedIds);
+}
+
+/** Aplica a lista da equipe sobre entradas ja prontas. */
+export function orderTeam(entries, allowedIds) {
+  if (!allowedIds.length) return [...entries].sort(byName);
   // A ordem da lista manda: assim a equipe aparece na ordem que voces definiram,
   // e quem sair do Monday simplesmente some da tela de entrada.
   const byId = new Map(entries.map(entry => [entry.id, entry]));
@@ -79,17 +89,26 @@ export async function fetchMondayUsers(token, fetchImpl = fetch, apiVersion = MO
  * tela de entrada quebrada.
  */
 export async function loadRoster({ storage, token, allowedIds, now = Date.now(), fetchImpl = fetch, apiVersion = MONDAY_API_VERSION }) {
+  // O cache guarda TODO MUNDO do Monday, nao a equipe ja filtrada. Guardando a
+  // lista filtrada, incluir alguem na equipe so teria efeito quando o cache
+  // vencesse — ate 6 horas depois.
   const cached = await storage.get(ROSTER_CACHE_KEY);
-  if (cached && now - cached.fetchedAt < ROSTER_TTL_MS) return { team: cached.team, source: "cache" };
-  if (!token) return { team: cached?.team ?? [], source: cached ? "cache-sem-token" : "vazio" };
+  const doCache = cached?.entries ?? cached?.team;
+
+  if (doCache && now - cached.fetchedAt < ROSTER_TTL_MS) {
+    return { team: orderTeam(doCache, allowedIds), source: "cache" };
+  }
+  if (!token) {
+    return { team: doCache ? orderTeam(doCache, allowedIds) : [], source: doCache ? "cache-sem-token" : "vazio" };
+  }
 
   try {
     const users = await fetchMondayUsers(token, fetchImpl, apiVersion);
-    const team = selectTeam(users, allowedIds);
-    await storage.put(ROSTER_CACHE_KEY, { team, fetchedAt: now });
-    return { team, source: "monday" };
+    const entries = toRosterEntries(users);
+    await storage.put(ROSTER_CACHE_KEY, { entries, fetchedAt: now });
+    return { team: orderTeam(entries, allowedIds), source: "monday" };
   } catch (error) {
-    if (cached) return { team: cached.team, source: "cache-expirado" };
+    if (doCache) return { team: orderTeam(doCache, allowedIds), source: "cache-expirado" };
     throw error;
   }
 }

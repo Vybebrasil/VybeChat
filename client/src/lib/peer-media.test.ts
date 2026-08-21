@@ -33,46 +33,60 @@ describe("linhas de mídia da conexão", () => {
   it("com câmera, reaproveita o sender do próprio track de vídeo", () => {
     const connection = fakeConnection();
     const stream = fakeStream(["audio", "video"]);
-    const sender = attachLocalMedia(connection as never, stream);
+    const { video: sender } = attachLocalMedia(connection as never, stream);
     expect(sender?.track).toMatchObject({ kind: "video" });
-    // Nada de transceiver extra: os dois tracks já criaram as duas linhas.
-    expect(connection.transceivers).toHaveLength(0);
+    // Os dois tracks locais já criam vídeo e microfone; sobra só a linha
+    // reservada ao som da tela compartilhada.
+    expect(connection.transceivers).toEqual([{ kind: "audio", direction: "sendrecv" }]);
   });
 
   it("sem câmera, ainda entrega um sender de vídeo utilizável", () => {
     const connection = fakeConnection();
-    const sender = attachLocalMedia(connection as never, fakeStream(["audio"]));
+    const { video: sender } = attachLocalMedia(connection as never, fakeStream(["audio"]));
     // Este é o caso que quebrava: sem sender de vídeo, compartilhar tela caía
     // numa renegociação no meio da chamada e derrubava a voz.
     expect(sender).not.toBeNull();
-    expect(connection.transceivers).toEqual([{ kind: "video", direction: "sendrecv" }]);
+    expect(connection.transceivers).toEqual([
+      { kind: "video", direction: "sendrecv" },
+      { kind: "audio", direction: "sendrecv" },
+    ]);
   });
 
   it("em modo de escuta, cria vídeo enviável e áudio só de recepção", () => {
     const connection = fakeConnection();
-    const sender = attachLocalMedia(connection as never, fakeStream([]));
+    const { video: sender } = attachLocalMedia(connection as never, fakeStream([]));
     expect(sender).not.toBeNull();
     expect(connection.transceivers).toEqual([
       { kind: "video", direction: "sendrecv" },
       { kind: "audio", direction: "recvonly" },
+      { kind: "audio", direction: "sendrecv" },
     ]);
   });
 
   it("sem stream nenhum não quebra e ainda prepara as duas linhas", () => {
     const connection = fakeConnection();
-    expect(attachLocalMedia(connection as never, null)).not.toBeNull();
-    expect(connection.transceivers.map(item => item.kind)).toEqual(["video", "audio"]);
+    expect(attachLocalMedia(connection as never, null).video).not.toBeNull();
+    expect(connection.transceivers.map(item => item.kind)).toEqual(["video", "audio", "audio"]);
   });
 
-  it("não cria linha de áudio duplicada quando já existe microfone", () => {
+  it("com microfone presente não cria linha de recepção sobrando", () => {
     const connection = fakeConnection();
     attachLocalMedia(connection as never, fakeStream(["audio"]));
-    expect(connection.transceivers.some(item => item.kind === "audio")).toBe(false);
+    expect(connection.transceivers.some(item => item.direction === "recvonly")).toBe(false);
+  });
+
+  it("reserva uma linha própria para o som da tela compartilhada", () => {
+    const connection = fakeConnection();
+    // Sem ela o áudio da aba era capturado e descartado, e quem compartilhava um
+    // vídeo chegava mudo do outro lado.
+    const { screenAudio } = attachLocalMedia(connection as never, fakeStream(["audio", "video"]));
+    expect(screenAudio).not.toBeNull();
+    expect(screenAudio?.track).toBeNull();
   });
 
   it("o sender de vídeo continua servindo depois de um replaceTrack(null)", () => {
     const connection = fakeConnection();
-    const sender = attachLocalMedia(connection as never, fakeStream(["audio"]))!;
+    const { video: sender } = attachLocalMedia(connection as never, fakeStream(["audio"]));
     // Parar de compartilhar zera o track. Antes disso o sender sumia da busca
     // por `track?.kind` e o próximo compartilhamento renegociava de novo.
     (sender as { track: FakeTrack | null }).track = null;

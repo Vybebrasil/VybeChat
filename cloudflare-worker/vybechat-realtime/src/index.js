@@ -235,7 +235,7 @@ export class VybeChatRoom {
       const state = this.getState(socket);
       if (!state?.callChannelId) continue;
       const members = rooms.get(state.callChannelId) ?? [];
-      members.push({ socketId: state.socketId, userId: state.userId, name: state.name, status: state.status, isMuted: state.isMuted, isSpeaking: state.isSpeaking, handRaised: Boolean(state.handRaised) });
+      members.push({ socketId: state.socketId, userId: state.userId, name: state.name, photo: state.photo ?? "", status: state.status, isMuted: state.isMuted, isSpeaking: state.isSpeaking, handRaised: Boolean(state.handRaised) });
       rooms.set(state.callChannelId, members);
     }
     return Array.from(rooms.entries()).map(([channelId, members]) => ({ channelId, members }));
