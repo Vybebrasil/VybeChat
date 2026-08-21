@@ -23,6 +23,7 @@ import { createSpeakingDetector } from "@/lib/speaking-detector";
 import { createNoiseGate, sensitivityToThreshold } from "@/lib/noise-gate";
 import { getIceServers } from "@/lib/ice-config";
 import { attachLocalMedia } from "@/lib/peer-media";
+import { getScreenConstraints, type ScreenQuality } from "@/lib/screen-share";
 import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
@@ -45,6 +46,7 @@ const PROFILE_KEY = "vybechat-cloudflare-profile";
 const WORKSPACE_CODE_KEY = "vybechat-workspace-code";
 const GATE_KEY = "vybechat-gate-sensitivity";
 const GATE_SCALE_KEY = "vybechat-gate-scale";
+const SCREEN_QUALITY_KEY = "vybechat-screen-quality";
 
 function initials(name: string) {
   return name.split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase() || "V";
@@ -89,6 +91,9 @@ export default function CloudflareHome() {
   // pessoa simplesmente nao ouvia ninguem, sem nenhuma pista do motivo.
   const [audioBlocked, setAudioBlocked] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
+  const [screenQuality, setScreenQuality] = useState<ScreenQuality>(() => {
+    try { return localStorage.getItem(SCREEN_QUALITY_KEY) === "fluida" ? "fluida" : "nitida"; } catch { return "nitida"; }
+  });
   const [unread, setUnread] = useState<UnreadMap>({});
   const [microphoneOn, setMicrophoneOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
@@ -173,6 +178,9 @@ export default function CloudflareHome() {
     document.title = total > 0 ? `(${total}) VybeChat` : "VybeChat — Central de comunicação";
   }, [unread]);
   useEffect(() => { pushToTalkRef.current = pushToTalkEnabled; }, [pushToTalkEnabled]);
+  useEffect(() => {
+    try { localStorage.setItem(SCREEN_QUALITY_KEY, screenQuality); } catch { /* storage indisponivel */ }
+  }, [screenQuality]);
   useEffect(() => {
     gateSensitivityRef.current = gateSensitivity;
     try { localStorage.setItem(GATE_KEY, String(gateSensitivity)); } catch { /* storage indisponivel */ }
@@ -764,7 +772,9 @@ export default function CloudflareHome() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      // Sem restricao o navegador entregava resolucao alta com poucos quadros:
+      // otimo para texto parado, travado para video.
+      const stream = await navigator.mediaDevices.getDisplayMedia(getScreenConstraints(screenQuality));
       const track = stream.getVideoTracks()[0];
       // O som da tela vai por uma linha propria: substituir o microfone deixaria
       // a pessoa muda enquanto compartilha.
@@ -807,7 +817,7 @@ export default function CloudflareHome() {
   const sidebar = <aside className={`${mobileSidebarOpen ? "fixed inset-y-0 left-0 z-40 flex w-[292px] shadow-2xl" : "hidden"} cyber-panel flex-col bg-[#0a0b0f]/98 md:relative md:flex md:w-[292px] md:shrink-0`}>
     <div className="border-b border-orange-300/15 px-5 py-5"><div className="flex items-start justify-between"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl border border-orange-300/45 bg-orange-400/10 text-sm font-extrabold text-orange-300">V</span><div><p className="cyber-label">Equipe Vybe</p><h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-orange-100">VybeChat</h2></div></div><button onClick={() => setMobileSidebarOpen(false)} className="grid size-8 rounded-lg border border-orange-300/15 text-orange-200 md:hidden" aria-label="Fechar canais"><X className="size-4" /></button></div><div className="mt-4 flex items-center gap-2 text-xs text-stone-400"><span className="size-1.5 rounded-full bg-emerald-400" />Todos os sistemas online</div></div>
     <div className="flex-1 overflow-y-auto px-3 py-4"><CommandNavigation unread={unread} groups={EXTERNAL_WORKSPACE} selectedChannelId={selectedChannelId} voiceRooms={voiceRooms} onSelectText={selectChannel} onJoinVoice={prepareVoice} /></div>
-    {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} micLevel={micLevel} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
+    {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} micLevel={micLevel} screenQuality={screenQuality} onScreenQualityChange={setScreenQuality} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
     <div className="flex items-center gap-2 border-t border-orange-300/15 p-3"><Avatar className="size-9">{profile.photo ? <AvatarImage src={profile.photo} alt="" className="rounded-xl object-cover" /> : null}<AvatarFallback className="rounded-xl border border-orange-300/25 bg-orange-400/10 text-xs text-orange-100">{initials(profile.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-orange-50">{profile.name}</p><p className="text-[11px] text-emerald-400">Online</p></div><button onClick={() => { leaveVoice(); localStorage.removeItem(PROFILE_KEY); setProfile(null); }} aria-label="Sair"><LogOut className="size-4 text-stone-500" /></button></div>
   </aside>;
 
