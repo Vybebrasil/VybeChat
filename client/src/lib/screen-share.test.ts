@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getScreenConstraints, pickPreviewParticipant, resolveStageFocus, SCREEN_QUALITY_HINT, SCREEN_QUALITY_LABEL } from "./screen-share";
+import { buildScreenParameters, getScreenConstraints, pickPreviewParticipant, resolveStageFocus, SCREEN_ENCODING, SCREEN_QUALITY_HINT, SCREEN_QUALITY_LABEL } from "./screen-share";
 
 describe("qualidade do compartilhamento", () => {
   it("fluida prioriza quadros, para vídeo não travar", () => {
@@ -76,5 +76,43 @@ describe("quem aparece no painel reduzido", () => {
 
   it("se só você compartilha, aparece a sua própria tela", () => {
     expect(pickPreviewParticipant([{ id: "local", isLocal: true, sharingScreen: true }])?.id).toBe("local");
+  });
+});
+
+describe("ajuste do codificador da tela", () => {
+  it("nítida preserva resolução e marca a imagem como detalhe", () => {
+    const cfg = SCREEN_ENCODING.nitida;
+    expect(cfg.degradationPreference).toBe("maintain-resolution");
+    expect(cfg.contentHint).toBe("detail");
+  });
+
+  it("fluida preserva quadros e marca como movimento", () => {
+    expect(SCREEN_ENCODING.fluida.degradationPreference).toBe("maintain-framerate");
+    expect(SCREEN_ENCODING.fluida.contentHint).toBe("motion");
+  });
+
+  it("libera banda suficiente para texto ficar legível", () => {
+    // O padrão do navegador é conservador demais e borra a imagem.
+    expect(SCREEN_ENCODING.nitida.maxBitrate).toBeGreaterThanOrEqual(2_000_000);
+  });
+
+  it("impede o navegador de reduzir a imagem por conta própria", () => {
+    const p = buildScreenParameters({ encodings: [{}] } as RTCRtpSendParameters, "nitida");
+    expect(p.encodings[0].scaleResolutionDownBy).toBe(1);
+    expect(p.encodings[0].maxBitrate).toBe(3_000_000);
+  });
+
+  it("preserva parâmetros que já existiam no remetente", () => {
+    const atual = { transactionId: "abc", encodings: [{ rid: "alta", active: true }] } as unknown as RTCRtpSendParameters;
+    const p = buildScreenParameters(atual, "fluida");
+    expect(p.transactionId).toBe("abc");
+    expect(p.encodings[0].rid).toBe("alta");
+    expect(p.encodings[0].active).toBe(true);
+  });
+
+  it("funciona mesmo quando o remetente não tem encodings ainda", () => {
+    const p = buildScreenParameters({} as RTCRtpSendParameters, "nitida");
+    expect(p.encodings).toHaveLength(1);
+    expect(p.encodings[0].maxBitrate).toBe(3_000_000);
   });
 });

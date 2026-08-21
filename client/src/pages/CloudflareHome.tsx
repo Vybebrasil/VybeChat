@@ -23,7 +23,7 @@ import { createSpeakingDetector } from "@/lib/speaking-detector";
 import { createNoiseGate, sensitivityToThreshold } from "@/lib/noise-gate";
 import { getIceServers } from "@/lib/ice-config";
 import { attachLocalMedia } from "@/lib/peer-media";
-import { getScreenConstraints, pickPreviewParticipant, type ScreenQuality } from "@/lib/screen-share";
+import { applyScreenEncoding, getScreenConstraints, pickPreviewParticipant, SCREEN_ENCODING, type ScreenQuality } from "@/lib/screen-share";
 import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
@@ -819,9 +819,15 @@ export default function CloudflareHome() {
       // O som da tela vai por uma linha propria: substituir o microfone deixaria
       // a pessoa muda enquanto compartilha.
       const audioDaTela = stream.getAudioTracks()[0] ?? null;
+      // Diz ao codificador o que a imagem e: sem isto ele trata a tela como
+      // video comum e derruba a resolucao para segurar os quadros, deixando
+      // texto ilegivel.
+      track.contentHint = SCREEN_ENCODING[screenQuality].contentHint;
       await Promise.all(Array.from(peerConnectionsRef.current.entries()).map(async ([peerId, connection]) => {
         try {
-          await videoSendersRef.current.get(peerId)?.replaceTrack(track);
+          const senderDeVideo = videoSendersRef.current.get(peerId);
+          await senderDeVideo?.replaceTrack(track);
+          if (senderDeVideo) await applyScreenEncoding(senderDeVideo, screenQuality);
           await screenAudioSendersRef.current.get(peerId)?.replaceTrack(audioDaTela);
           // A linha nasce sem track e o outro lado a responde como "so recebo".
           // Sem reabrir os dois sentidos, a tela nunca chega la.
