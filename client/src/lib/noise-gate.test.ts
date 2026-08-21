@@ -1,46 +1,47 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createNoiseGate, DEFAULT_GATE_THRESHOLD, GATE_HOLD_MS, sensitivityToThreshold, shouldGateOpen } from "./noise-gate";
+import { createNoiseGate, DEFAULT_GATE_THRESHOLD_DB, GATE_HOLD_MS, sensitivityToThreshold, shouldGateOpen } from "./noise-gate";
 
 describe("portão de ruído", () => {
   const agora = 100_000;
 
   it("abre enquanto a pessoa fala acima do limiar", () => {
-    expect(shouldGateOpen({ level: 0.08, threshold: DEFAULT_GATE_THRESHOLD, lastVoiceAt: 0, now: agora })).toBe(true);
+    // Fala normal fica em torno de -30 dBFS; o limiar padrão é -50.
+    expect(shouldGateOpen({ level: -30, threshold: DEFAULT_GATE_THRESHOLD_DB, lastVoiceAt: 0, now: agora })).toBe(true);
   });
 
   it("fecha no silêncio, depois da janela de retenção", () => {
-    expect(shouldGateOpen({ level: 0.001, threshold: DEFAULT_GATE_THRESHOLD, lastVoiceAt: agora - GATE_HOLD_MS - 1, now: agora })).toBe(false);
+    expect(shouldGateOpen({ level: -70, threshold: DEFAULT_GATE_THRESHOLD_DB, lastVoiceAt: agora - GATE_HOLD_MS - 1, now: agora })).toBe(false);
   });
 
   it("segura aberto entre frases para não cortar sílaba", () => {
-    // Sem isto o microfone piscaria a cada pausa curta e cortaria o começo das palavras.
-    expect(shouldGateOpen({ level: 0, threshold: DEFAULT_GATE_THRESHOLD, lastVoiceAt: agora - 300, now: agora })).toBe(true);
+    expect(shouldGateOpen({ level: -80, threshold: DEFAULT_GATE_THRESHOLD_DB, lastVoiceAt: agora - 300, now: agora })).toBe(true);
   });
 
   it("som de fundo baixo não abre o portão", () => {
-    // O caso do jogo tocando na caixa de som durante o silêncio de quem fala.
-    expect(shouldGateOpen({ level: 0.012, threshold: DEFAULT_GATE_THRESHOLD, lastVoiceAt: 0, now: agora })).toBe(false);
+    // Jogo tocando na caixa de som enquanto ninguém fala.
+    expect(shouldGateOpen({ level: -56, threshold: DEFAULT_GATE_THRESHOLD_DB, lastVoiceAt: 0, now: agora })).toBe(false);
   });
 
-  it("sensibilidade da interface vira limiar utilizável", () => {
-    expect(sensitivityToThreshold(0)).toBe(0);
-    expect(sensitivityToThreshold(100)).toBeCloseTo(0.12, 5);
+  it("a posição do controle vira um limiar dentro da faixa da barra", () => {
+    expect(sensitivityToThreshold(0)).toBe(-60);
+    expect(sensitivityToThreshold(100)).toBe(0);
     expect(sensitivityToThreshold(50)).toBeGreaterThan(sensitivityToThreshold(20));
   });
 
   it("valor fora da faixa não quebra o cálculo", () => {
-    expect(sensitivityToThreshold(-40)).toBe(0);
-    expect(sensitivityToThreshold(9999)).toBeCloseTo(0.12, 5);
+    expect(sensitivityToThreshold(-40)).toBe(-60);
+    expect(sensitivityToThreshold(9999)).toBe(0);
   });
 
-  it("limiar zero mantém o portão sempre aberto", () => {
-    // É como a pessoa desliga o recurso sem precisar de outra opção.
-    expect(shouldGateOpen({ level: 0, threshold: 0, lastVoiceAt: 0, now: agora })).toBe(true);
+  it("no piso da escala, qualquer som fica acima do limiar", () => {
+    // É assim que a pessoa desliga o recurso: o corte desce até o fundo e nada
+    // mais é barrado. O curto-circuito completo mora em createNoiseGate.
+    expect(shouldGateOpen({ level: -60, threshold: sensitivityToThreshold(0), lastVoiceAt: 0, now: agora })).toBe(true);
   });
 
   it("mais sensível corta mais som de fundo", () => {
-    const fundo = 0.03;
+    const fundo = -45;
     const brando = sensitivityToThreshold(10);
     const rigido = sensitivityToThreshold(40);
     expect(shouldGateOpen({ level: fundo, threshold: brando, lastVoiceAt: 0, now: agora })).toBe(true);
@@ -70,7 +71,7 @@ describe("o portão não pode ficar surdo ao fechar o microfone", () => {
 
   it("analisa um clone, não o track que ele mesmo desliga", () => {
     const { track, clonado, stream, source } = ambiente();
-    const stop = createNoiseGate({ stream, getThreshold: () => DEFAULT_GATE_THRESHOLD, isEnabled: () => true });
+    const stop = createNoiseGate({ stream, getThreshold: () => DEFAULT_GATE_THRESHOLD_DB, isEnabled: () => true });
 
     // Sem o clone, fechar o microfone silenciava também o analisador: o portão
     // nunca mais detectava fala e a pessoa ficava muda o resto da chamada.
@@ -82,7 +83,7 @@ describe("o portão não pode ficar surdo ao fechar o microfone", () => {
 
   it("solta o clone e devolve o microfone ao desmontar", () => {
     const { track, clonado, stream } = ambiente();
-    const stop = createNoiseGate({ stream, getThreshold: () => DEFAULT_GATE_THRESHOLD, isEnabled: () => true });
+    const stop = createNoiseGate({ stream, getThreshold: () => DEFAULT_GATE_THRESHOLD_DB, isEnabled: () => true });
     track.enabled = false;
     stop?.();
     expect(clonado.stop).toHaveBeenCalled();

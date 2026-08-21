@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getCallConstraints, type CallDeviceSelection } from "@/lib/call-media";
-import { judgePeak, passesGate, recordMicSample, toMeterPercent, VERDICT_TEXT, type PreviewVerdict } from "@/lib/mic-preview";
+import { judgePeak, recordMicSample, VERDICT_TEXT, type PreviewVerdict } from "@/lib/mic-preview";
 import { createNoiseGate, sensitivityToThreshold } from "@/lib/noise-gate";
-import { getAudioLevel } from "@/lib/speaking-detector";
+import { MicSensitivityMeter } from "@/components/MicSensitivityMeter";
 import { AudioLines, CheckCircle2, Loader2, Mic, Play, Video, VideoOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -34,9 +34,6 @@ export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gate
   const gateSensitivityRef = useRef(gateSensitivity);
   useEffect(() => { gateSensitivityRef.current = gateSensitivity; }, [gateSensitivity]);
 
-  // O medidor e o controle usam a mesma escala: se a barra passa da marca, sua
-  // voz esta sendo transmitida. Era isso que faltava para o numero ter sentido.
-  const transmitindo = passesGate(audioLevel, gateSensitivity);
   const veredito: PreviewVerdict = judgePeak(peak);
 
   const ouvirMinhaVoz = async () => {
@@ -78,31 +75,19 @@ export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gate
       if (previewRef.current) previewRef.current.srcObject = stream;
       setStatus("ready");
       setMessage("Dispositivos prontos. Seu microfone e sua câmera estão disponíveis.");
-      const AudioContextClass = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass || !stream.getAudioTracks().length) return;
-      const context = new AudioContextClass();
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 256;
-      context.createMediaStreamSource(stream).connect(analyser);
-      const samples = new Uint8Array(analyser.frequencyBinCount);
-      let frame = 0;
-      const updateLevel = () => {
-        analyser.getByteTimeDomainData(samples);
-        // Mesma medida usada pelo portao na chamada, na mesma escala do controle.
-        const nivel = toMeterPercent(getAudioLevel(samples));
-        setAudioLevel(nivel);
-        setPeak(anterior => Math.max(anterior, nivel));
-        frame = requestAnimationFrame(updateLevel);
-      };
-      updateLevel();
-      // O portao roda tambem aqui: a previa mostra e grava exatamente o que os
-      // outros recebem, nao o microfone cru.
+      // O nivel vem do proprio portao, que mede um clone do microfone. Medir o
+      // track cortado fazia a barra despencar a zero abaixo do corte, e assim
+      // era impossivel enxergar o quanto faltava para ajustar.
       const soltarPortao = createNoiseGate({
         stream,
         getThreshold: () => sensitivityToThreshold(gateSensitivityRef.current),
         isEnabled: () => true,
+        onLevel: nivel => {
+          setAudioLevel(nivel);
+          setPeak(anterior => Math.max(anterior, nivel));
+        },
       });
-      stream.getTracks().forEach(track => { track.onended = () => { cancelAnimationFrame(frame); soltarPortao?.(); void context.close(); }; });
+      stream.getTracks().forEach(track => { track.onended = () => soltarPortao?.(); });
     } catch (error) {
       setStatus("error");
       const name = error instanceof DOMException ? error.name : "";
@@ -119,13 +104,8 @@ export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gate
     return stopPreview;
   }, [open]);
 
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="vybe-preflight max-w-xl border-orange-300/25 bg-[#101116] p-0 text-orange-50" showCloseButton={false}><div className="p-5 sm:p-6"><DialogHeader><p className="cyber-label">Pré-checagem da chamada</p><DialogTitle className="text-xl text-orange-50">Entrar em {roomName}</DialogTitle><DialogDescription className="text-stone-400">Confirme seus dispositivos antes de entrar. Você poderá alterá-los durante a chamada.</DialogDescription></DialogHeader><div className="mt-5 grid gap-4 sm:grid-cols-[1.1fr_.9fr]"><div className="relative min-h-44 overflow-hidden rounded-2xl border border-orange-300/20 bg-black/40"><video ref={previewRef} autoPlay muted playsInline className="h-full w-full object-cover" />{status !== "ready" && <div className="absolute inset-0 grid place-items-center text-center"><div><VideoOff className="mx-auto size-7 text-orange-300" /><p className="mt-2 text-xs text-stone-400">Preview da câmera</p></div></div>}</div><div className="space-y-3"><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Mic className="size-3.5 text-orange-300" />Microfone</span><select value={audioInputId} onChange={event => setAudioInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{audioInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Video className="size-3.5 text-orange-300" />Câmera</span><select value={videoInputId} onChange={event => setVideoInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{videoInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><div className="rounded-xl border border-orange-300/15 bg-orange-400/5 p-3"><span className="flex items-center gap-1.5 text-xs font-medium text-orange-100"><AudioLines className="size-3.5 text-orange-300" />Nível do microfone</span><div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-black/60">
-  <div className={`h-full rounded-full transition-[width] duration-75 ${transmitindo ? "bg-gradient-to-r from-emerald-400 to-emerald-300" : "bg-stone-600"}`} style={{ width: `${Math.max(2, audioLevel)}%` }} />
-  {gateSensitivity > 0 && <span aria-hidden className="absolute inset-y-0 w-0.5 bg-orange-400 shadow-[0_0_6px_rgba(255,138,0,.9)]" style={{ left: `${gateSensitivity}%` }} />}
-</div>
-<p className={`mt-1.5 text-[11px] font-semibold ${transmitindo ? "text-emerald-300" : "text-stone-500"}`}>{transmitindo ? "Transmitindo agora" : "Silenciado — abaixo do corte"}</p>
-<p className="mt-0.5 text-[10px] leading-4 text-stone-500">{VERDICT_TEXT[veredito]}</p>
-<label className="mt-3 block border-t border-orange-300/10 pt-2.5"><span className="flex items-center justify-between gap-2 text-xs font-medium text-orange-100"><span>Cortar som de fundo</span><span className="font-mono text-[10px] text-stone-400">{gateSensitivity === 0 ? "desligado" : `${gateSensitivity}%`}</span></span><input aria-label="Cortar som de fundo" type="range" min="0" max="60" value={gateSensitivity} onChange={event => onGateSensitivityChange(Number(event.target.value))} className="mt-2 h-1 w-full accent-orange-400" /><span className="mt-1 block text-[10px] leading-4 text-stone-500">A marca laranja é o corte. Sua voz precisa passar dela para ser transmitida.</span></label>
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="vybe-preflight max-w-xl border-orange-300/25 bg-[#101116] p-0 text-orange-50" showCloseButton={false}><div className="p-5 sm:p-6"><DialogHeader><p className="cyber-label">Pré-checagem da chamada</p><DialogTitle className="text-xl text-orange-50">Entrar em {roomName}</DialogTitle><DialogDescription className="text-stone-400">Confirme seus dispositivos antes de entrar. Você poderá alterá-los durante a chamada.</DialogDescription></DialogHeader><div className="mt-5 grid gap-4 sm:grid-cols-[1.1fr_.9fr]"><div className="relative min-h-44 overflow-hidden rounded-2xl border border-orange-300/20 bg-black/40"><video ref={previewRef} autoPlay muted playsInline className="h-full w-full object-cover" />{status !== "ready" && <div className="absolute inset-0 grid place-items-center text-center"><div><VideoOff className="mx-auto size-7 text-orange-300" /><p className="mt-2 text-xs text-stone-400">Preview da câmera</p></div></div>}</div><div className="space-y-3"><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Mic className="size-3.5 text-orange-300" />Microfone</span><select value={audioInputId} onChange={event => setAudioInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{audioInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Video className="size-3.5 text-orange-300" />Câmera</span><select value={videoInputId} onChange={event => setVideoInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{videoInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><div className="rounded-xl border border-orange-300/15 bg-orange-400/5 p-3"><span className="flex items-center gap-1.5 text-xs font-medium text-orange-100"><AudioLines className="size-3.5 text-orange-300" />Nível do microfone</span><MicSensitivityMeter className="mt-2" level={audioLevel} sensitivity={gateSensitivity} onSensitivityChange={onGateSensitivityChange} live={status === "ready"} />
+<p className="mt-1 text-[10px] leading-4 text-stone-500">{VERDICT_TEXT[veredito]}</p>
 <button type="button" onClick={ouvirMinhaVoz} disabled={gravando} className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-orange-300/25 py-2 text-[11px] font-semibold text-orange-100 hover:bg-orange-400/10 disabled:opacity-60">
   {gravando ? <><Loader2 className="size-3.5 animate-spin" />Gravando…</> : <><Play className="size-3.5" />Ouvir minha voz</>}
 </button>

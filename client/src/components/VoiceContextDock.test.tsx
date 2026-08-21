@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { VoiceContextDock } from "./VoiceContextDock";
 
-const props = { roomName: "Sala Geral", participantCount: 2, microphoneOn: true, cameraOn: true, screenSharing: false, audioInputs: [{ deviceId: "mic-1", label: "Microfone USB" }], selectedAudioInput: "", onAudioInputChange: vi.fn(), onToggleMic: vi.fn(), onToggleCamera: vi.fn(), onShareScreen: vi.fn(), onOpenFocus: vi.fn(), onLeave: vi.fn(), gateSensitivity: 18, onGateSensitivityChange: vi.fn() };
+const props = { roomName: "Sala Geral", participantCount: 2, microphoneOn: true, cameraOn: true, screenSharing: false, audioInputs: [{ deviceId: "mic-1", label: "Microfone USB" }], selectedAudioInput: "", onAudioInputChange: vi.fn(), onToggleMic: vi.fn(), onToggleCamera: vi.fn(), onShareScreen: vi.fn(), onOpenFocus: vi.fn(), onLeave: vi.fn(), gateSensitivity: 18, onGateSensitivityChange: vi.fn(), micLevel: 0 };
 
 describe("VoiceContextDock", () => {
   it("mantém controles, foco e seleção de microfone no contexto da conversa", () => {
@@ -18,19 +18,29 @@ describe("VoiceContextDock", () => {
 
 // Este projeto nao registra limpeza automatica do testing-library, entao as
 // buscas ficam escopadas ao container de cada render.
-describe("controle de som de fundo", () => {
-  it("mostra o corte de som de fundo e reporta a mudança", () => {
+describe("sensibilidade do microfone", () => {
+  it("mostra a barra com o corte e reporta a mudança", () => {
     const onGateSensitivityChange = vi.fn();
-    const { container } = render(<VoiceContextDock {...props} gateSensitivity={18} onGateSensitivityChange={onGateSensitivityChange} />);
-    const slider = container.querySelector('input[type="range"][aria-label="Cortar som de fundo"]') as HTMLInputElement;
+    const { container } = render(<VoiceContextDock {...props} gateSensitivity={18} micLevel={40} onGateSensitivityChange={onGateSensitivityChange} />);
+    const slider = container.querySelector('input[type="range"][aria-label="Sensibilidade do microfone"]') as HTMLInputElement;
     expect(slider).toBeTruthy();
     expect(slider.value).toBe("18");
     fireEvent.change(slider, { target: { value: "40" } });
     expect(onGateSensitivityChange).toHaveBeenCalledWith(40);
   });
 
-  it("deixa claro quando está desligado", () => {
-    const { container } = render(<VoiceContextDock {...props} gateSensitivity={0} onGateSensitivityChange={vi.fn()} />);
-    expect(container.textContent).toContain("desligado");
+  it("diz que está transmitindo quando a voz passa do corte", () => {
+    const { container } = render(<VoiceContextDock {...props} gateSensitivity={18} micLevel={45} onGateSensitivityChange={vi.fn()} />);
+    expect(container.textContent).toContain("transmitindo");
+  });
+
+  it("diz que está silenciado quando a voz fica abaixo", () => {
+    const { container } = render(<VoiceContextDock {...props} gateSensitivity={40} micLevel={10} onGateSensitivityChange={vi.fn()} />);
+    expect(container.textContent).toContain("silenciado");
+  });
+
+  it("com o corte no piso, avisa que tudo passa", () => {
+    const { container } = render(<VoiceContextDock {...props} gateSensitivity={0} micLevel={5} onGateSensitivityChange={vi.fn()} />);
+    expect(container.textContent).toContain("sempre aberto");
   });
 });

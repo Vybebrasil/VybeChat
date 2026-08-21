@@ -41,20 +41,35 @@ export function CallAudioSink({ streams, volumes, onBlocked }: CallAudioSinkProp
 
 function PeerAudio({ stream, volume, onBlocked }: { stream: MediaStream; volume: number; onBlocked?: (blocked: boolean) => void }) {
   const ref = useRef<HTMLAudioElement>(null);
+  // `onBlocked` chega como função nova a cada render do app. Se ela entrar nas
+  // dependências do efeito, todo render reatribui o srcObject e chama play() de
+  // novo — o que interrompe a reprodução. Como a tela re-renderiza várias vezes
+  // por segundo (métricas da chamada, nível do microfone, presença), a voz de
+  // todo mundo era picotada continuamente. Guardada num ref, ela não dispara
+  // mais nada.
+  const onBlockedRef = useRef(onBlocked);
+  useEffect(() => { onBlockedRef.current = onBlocked; }, [onBlocked]);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-    element.srcObject = stream;
+    // Reatribuir o mesmo stream reinicia a reprodução à toa.
+    if (element.srcObject !== stream) element.srcObject = stream;
     let cancelled = false;
     const attempt = () => {
+      // Já tocando: mexer aqui só causaria falha.
+      if (!element.paused) return;
       const playback = element.play();
       if (!playback || typeof playback.catch !== "function") return;
       // O navegador pode recusar o autoplay. Antes o erro era engolido e o áudio
       // sumia em silêncio; agora avisamos para a interface poder pedir um clique.
       void playback.then(
-        () => { if (!cancelled) onBlocked?.(false); },
-        () => { if (!cancelled) onBlocked?.(true); },
+        () => { if (!cancelled) onBlockedRef.current?.(false); },
+        (error: unknown) => {
+          // AbortError não é bloqueio: é uma reprodução substituída por outra.
+          const abortada = error instanceof DOMException && error.name === "AbortError";
+          if (!cancelled && !abortada) onBlockedRef.current?.(true);
+        },
       );
     };
     attempt();
@@ -65,7 +80,7 @@ function PeerAudio({ stream, volume, onBlocked }: { stream: MediaStream; volume:
       cancelled = true;
       stream.removeEventListener("addtrack", attempt);
     };
-  }, [stream, onBlocked]);
+  }, [stream]);
 
   useEffect(() => {
     if (ref.current) ref.current.volume = toMediaElementVolume(volume);
