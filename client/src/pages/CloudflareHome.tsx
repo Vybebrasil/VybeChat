@@ -100,6 +100,7 @@ export default function CloudflareHome() {
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [screenSharer, setScreenSharer] = useState<string | null>(null);
   const [screenSharerId, setScreenSharerId] = useState<string | null>(null);
+  const screenSharerIdRef = useRef<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [callStageOpen, setCallStageOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -171,6 +172,7 @@ export default function CloudflareHome() {
 
   useEffect(() => { selectedChannelIdRef.current = selectedChannelId; }, [selectedChannelId]);
   useEffect(() => { microphoneOnRef.current = microphoneOn; }, [microphoneOn]);
+  useEffect(() => { screenSharerIdRef.current = screenSharerId; }, [screenSharerId]);
 
   useEffect(() => {
     // Contador no titulo da aba: com o VybeChat em segundo plano, e o unico
@@ -462,6 +464,13 @@ export default function CloudflareHome() {
       videoSendersRef.current.delete(socketId);
       screenAudioSendersRef.current.delete(socketId);
       clearRestartTimer(socketId);
+      // Se quem saiu era quem compartilhava, o Worker nao avisa que a
+      // transmissao acabou: o aviso "Tela ao vivo" ficava aceso para sempre e o
+      // palco seguia tentando focar alguem que nao esta mais na sala.
+      if (screenSharerIdRef.current === socketId) {
+        setScreenSharerId(null);
+        setScreenSharer(null);
+      }
       setRemoteStreams(current => current.filter(item => item.socketId !== socketId));
       setCallPeers(current => {
         const next = { ...current };
@@ -677,6 +686,9 @@ export default function CloudflareHome() {
     peerConnectionsRef.current.forEach(peer => peer.close());
     peerConnectionsRef.current.clear();
     pendingIceCandidatesRef.current.clear();
+    // Sem isto um reinicio de ICE agendado disparava depois de a pessoa sair.
+    restartTimersRef.current.forEach(timer => window.clearTimeout(timer));
+    restartTimersRef.current.clear();
     videoSendersRef.current.clear();
     screenAudioSendersRef.current.clear();
     negotiationRef.current.clear();
