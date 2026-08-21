@@ -42,9 +42,20 @@ export function isMissingDeviceError(error: unknown) {
   return name === "NotFoundError" || name === "NotAllowedError" || name === "NotReadableError" || name === "OverconstrainedError";
 }
 
-export async function getCallMedia(mediaDevices: MediaDevicesLike, selection: CallDeviceSelection = {}): Promise<CallMediaResult> {
+/**
+ * Ao entrar numa sala pedimos so o microfone. Antes a camera era ligada e logo
+ * silenciada: a luz acendia, o navegador pedia permissao de video e a pessoa
+ * entrava com a camera engatada sem precisar. A camera passa a ser ligada apenas
+ * quando alguem clica em "Ligar camera".
+ */
+export async function getCallMedia(
+  mediaDevices: MediaDevicesLike,
+  selection: CallDeviceSelection = {},
+  { includeVideo = false }: { includeVideo?: boolean } = {},
+): Promise<CallMediaResult> {
   const constraints = getCallConstraints(selection);
   try {
+    if (!includeVideo) throw new Error("entrada somente com microfone");
     const stream = await mediaDevices.getUserMedia({ video: constraints.video, audio: constraints.audio });
     return { stream, mode: "camera-and-audio" };
   } catch {
@@ -59,6 +70,15 @@ export async function getCallMedia(mediaDevices: MediaDevicesLike, selection: Ca
       return { stream: new MediaStream(), mode: "listen-only" };
     }
   }
+}
+
+/** Liga a camera durante a chamada, sem renegociar: o sender de video ja existe. */
+export async function getCameraTrack(mediaDevices: MediaDevicesLike, selection: CallDeviceSelection = {}) {
+  const { video } = getCallConstraints(selection);
+  const stream = await mediaDevices.getUserMedia({ video, audio: false });
+  const track = stream.getVideoTracks()[0];
+  if (!track) throw new DOMException("Nenhuma câmera foi retornada pelo dispositivo.", "NotFoundError");
+  return { stream, track };
 }
 
 export function getCallMediaErrorMessage(error: unknown) {
