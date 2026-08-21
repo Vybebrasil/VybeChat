@@ -20,6 +20,7 @@ import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspac
 import { drainIceCandidates, queueIceCandidate, type PendingIceCandidates } from "@/lib/ice-candidates";
 import { CallAudioSink } from "@/components/CallAudioSink";
 import { createSpeakingDetector } from "@/lib/speaking-detector";
+import { createNoiseGate, sensitivityToThreshold } from "@/lib/noise-gate";
 import { getIceServers } from "@/lib/ice-config";
 import { attachLocalMedia } from "@/lib/peer-media";
 import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
@@ -41,6 +42,7 @@ type CallPeer = { socketId: string; name: string };
 
 const PROFILE_KEY = "vybechat-cloudflare-profile";
 const WORKSPACE_CODE_KEY = "vybechat-workspace-code";
+const GATE_KEY = "vybechat-gate-sensitivity";
 
 function initials(name: string) {
   return name.split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase() || "V";
@@ -98,6 +100,11 @@ export default function CloudflareHome() {
   const [status, setStatus] = useState<Presence["status"]>("online");
   const [statusMessage, setStatusMessage] = useState("");
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
+  // Sensibilidade do portao de ruido, de 0 (desligado) a 100. O padrao ja corta
+  // fundo constante sem atrapalhar a fala.
+  const [gateSensitivity, setGateSensitivity] = useState(() => {
+    try { return Number(localStorage.getItem(GATE_KEY) ?? 18); } catch { return 18; }
+  });
   const [pushToTalkKey, setPushToTalkKey] = useState<"Space" | "KeyV">("Space");
   const [isTransmitting, setIsTransmitting] = useState(false);
   const [typingNames, setTypingNames] = useState<string[]>([]);
@@ -132,9 +139,28 @@ export default function CloudflareHome() {
   // canal de texto durante a chamada re-registrava todos os handlers.
   const selectedChannelIdRef = useRef(selectedChannelId);
   const microphoneOnRef = useRef(true);
+  const gateSensitivityRef = useRef(gateSensitivity);
+  const pushToTalkRef = useRef(false);
 
   useEffect(() => { selectedChannelIdRef.current = selectedChannelId; }, [selectedChannelId]);
   useEffect(() => { microphoneOnRef.current = microphoneOn; }, [microphoneOn]);
+  useEffect(() => { pushToTalkRef.current = pushToTalkEnabled; }, [pushToTalkEnabled]);
+  useEffect(() => {
+    gateSensitivityRef.current = gateSensitivity;
+    try { localStorage.setItem(GATE_KEY, String(gateSensitivity)); } catch { /* storage indisponivel */ }
+  }, [gateSensitivity]);
+
+  useEffect(() => {
+    if (!localStream || !activeCallChannelId) return;
+    const stop = createNoiseGate({
+      stream: localStream,
+      getThreshold: () => sensitivityToThreshold(gateSensitivityRef.current),
+      // Nao mexe no microfone quando ja esta mudo ou sob push-to-talk: senao o
+      // portao reabriria um microfone que a pessoa fechou de proposito.
+      isEnabled: () => microphoneOnRef.current && !pushToTalkRef.current,
+    });
+    return () => { stop?.(); };
+  }, [activeCallChannelId, localStream]);
 
   const selectedChannel = useMemo(() => findExternalChannel(selectedChannelId), [selectedChannelId]);
   const isContextPreview = window.location.pathname === "/cloudflare-preview" && new URLSearchParams(window.location.search).get("demo") === "1" && new URLSearchParams(window.location.search).get("call") === "1";
@@ -731,7 +757,7 @@ export default function CloudflareHome() {
   const sidebar = <aside className={`${mobileSidebarOpen ? "fixed inset-y-0 left-0 z-40 flex w-[292px] shadow-2xl" : "hidden"} cyber-panel flex-col bg-[#0a0b0f]/98 md:relative md:flex md:w-[292px] md:shrink-0`}>
     <div className="border-b border-orange-300/15 px-5 py-5"><div className="flex items-start justify-between"><div className="flex items-start gap-3"><span className="grid size-10 place-items-center rounded-xl border border-orange-300/45 bg-orange-400/10 text-sm font-extrabold text-orange-300">V</span><div><p className="cyber-label">Equipe Vybe</p><h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-orange-100">VybeChat</h2></div></div><button onClick={() => setMobileSidebarOpen(false)} className="grid size-8 rounded-lg border border-orange-300/15 text-orange-200 md:hidden" aria-label="Fechar canais"><X className="size-4" /></button></div><div className="mt-4 flex items-center gap-2 text-xs text-stone-400"><span className="size-1.5 rounded-full bg-emerald-400" />Todos os sistemas online</div></div>
     <div className="flex-1 overflow-y-auto px-3 py-4"><CommandNavigation groups={EXTERNAL_WORKSPACE} selectedChannelId={selectedChannelId} voiceRooms={voiceRooms} onSelectText={selectChannel} onJoinVoice={prepareVoice} /></div>
-    {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
+    {activeCallChannelId && <div className="border-y border-orange-300/15 p-3"><VoiceContextDock roomName={findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz"} participantCount={activeRoomMembers.length} microphoneOn={microphoneOn} cameraOn={cameraOn} screenSharing={Boolean(screenStream)} audioInputs={audioInputs} selectedAudioInput={selectedAudioInput} onAudioInputChange={changeAudioInput} gateSensitivity={gateSensitivity} onGateSensitivityChange={setGateSensitivity} onToggleMic={toggleMic} onToggleCamera={toggleCamera} onShareScreen={shareScreen} onOpenFocus={() => setCallStageOpen(true)} onLeave={leaveVoice} /></div>}
     <div className="flex items-center gap-2 border-t border-orange-300/15 p-3"><Avatar className="size-9">{profile.photo ? <AvatarImage src={profile.photo} alt="" className="rounded-xl object-cover" /> : null}<AvatarFallback className="rounded-xl border border-orange-300/25 bg-orange-400/10 text-xs text-orange-100">{initials(profile.name)}</AvatarFallback></Avatar><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-orange-50">{profile.name}</p><p className="text-[11px] text-emerald-400">Online</p></div><button onClick={() => { leaveVoice(); localStorage.removeItem(PROFILE_KEY); setProfile(null); }} aria-label="Sair"><LogOut className="size-4 text-stone-500" /></button></div>
   </aside>;
 

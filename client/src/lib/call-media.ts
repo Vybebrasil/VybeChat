@@ -17,7 +17,18 @@ export const CALL_AUDIO_CONSTRAINTS = {
   noiseSuppression: true,
   autoGainControl: true,
   channelCount: 1,
-};
+  // Isolamento de voz do Chrome: separa a voz de quem esta perto do microfone do
+  // resto — musica, jogo, TV, gente falando ao fundo. E o unico recurso do
+  // navegador que ataca o caso de alguem com caixa de som, porque o cancelamento
+  // de eco so cancela o que o proprio navegador toca, nao o audio de outro
+  // programa. Navegador que nao conhece a propriedade simplesmente a ignora.
+  voiceIsolation: true,
+  // Nomes antigos, ainda respeitados por versoes do Chromium em uso.
+  googEchoCancellation: true,
+  googNoiseSuppression: true,
+  googAutoGainControl: true,
+  googHighpassFilter: true,
+} as MediaTrackConstraints;
 
 export const CALL_VIDEO_CONSTRAINTS = {
   width: { ideal: 1280 },
