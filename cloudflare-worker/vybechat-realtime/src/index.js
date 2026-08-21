@@ -1,5 +1,6 @@
 import { canInvite, canManagePermissions, canModerate, canPost, normalizePermissions, normalizeRole } from "./policy.js";
 import { loadRoster, MONDAY_PREFIX, parseIdList } from "./roster.js";
+import { collectChannelIds, DEFAULT_WORKSPACE, loadWorkspace, sanitizeWorkspace, WORKSPACE_KEY } from "./workspace.js";
 
 const CHANNEL_IDS = Array.from({ length: 17 }, (_, index) => index + 1);
 
@@ -7,12 +8,18 @@ function json(type, payload) {
   return JSON.stringify({ type, payload });
 }
 
-const CHANNEL_ID_SET = new Set(CHANNEL_IDS);
+// Os ids validos vem da estrutura de canais da equipe, que agora e editavel.
+// Guardados em memoria porque handleEvent e sincrono na validacao.
+let channelIdCache = collectChannelIds(DEFAULT_WORKSPACE);
+
+function setChannelIdCache(workspace) {
+  channelIdCache = collectChannelIds(workspace);
+}
 
 // Antes qualquer id ate 99 era gravavel, mas a busca so varria CHANNEL_IDS:
 // dava para escrever em canais fantasma que a interface nunca mostra.
 function validChannelId(value) {
-  return Number.isInteger(value) && CHANNEL_ID_SET.has(value);
+  return Number.isInteger(value) && channelIdCache.has(value);
 }
 
 function validStatus(value) {
@@ -315,6 +322,7 @@ export class VybeChatRoom {
       this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), photo: String(payload.photo ?? "").slice(0, 400), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: normalizeRole(storedRole ?? roleForUser(userId, this.env)) });
       // O cliente precisa do proprio socketId para resolver colisao de ofertas
       // na chamada sem trocar mensagem extra entre os pares.
+      setChannelIdCache(await loadWorkspace(this.ctx.storage));
       socket.send(json("session:ready", { socketId: state.socketId }));
       socket.send(json("voice:rooms", this.voiceRooms()));
       this.broadcastPresence();
@@ -398,6 +406,29 @@ export class VybeChatRoom {
       const updated = { ...thread, unreadCount: 0 };
       await this.putDirectIndex(state.userId, [...index.filter(item => item.id !== threadId), updated]);
       socket.send(json("direct:read", { thread: updated }));
+      return;
+    }
+
+    if (type === "workspace:list") {
+      const workspace = await loadWorkspace(this.ctx.storage);
+      setChannelIdCache(workspace);
+      socket.send(json("workspace:list", { workspace }));
+      return;
+    }
+
+    if (type === "workspace:update") {
+      if (!canManagePermissions(state.role)) {
+        return socket.send(json("realtime:error", { message: "Apenas administradores podem alterar os canais." }));
+      }
+      const workspace = sanitizeWorkspace(payload.workspace);
+      if (!workspace) {
+        return socket.send(json("realtime:error", { message: "Estrutura de canais inválida." }));
+      }
+      await this.ctx.storage.put(WORKSPACE_KEY, workspace);
+      setChannelIdCache(workspace);
+      // Todo mundo recebe na hora: sem isso metade da equipe ficaria vendo
+      // canais que nao existem mais.
+      this.broadcast("workspace:list", { workspace });
       return;
     }
 
