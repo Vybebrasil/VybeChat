@@ -58,3 +58,38 @@ describe("CallAudioSink", () => {
     play.mockRestore();
   });
 });
+
+describe("a reprodução não pode reiniciar a cada render", () => {
+  it("re-renderizar com onBlocked novo não mexe no áudio que já toca", async () => {
+    const play = vi.spyOn(window.HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    // jsdom nasce com o elemento pausado; simulamos que já está tocando.
+    const paused = vi.spyOn(window.HTMLMediaElement.prototype, "paused", "get").mockReturnValue(false);
+    const stream = fakeStream();
+
+    const { rerender } = render(<CallAudioSink streams={[{ socketId: "a", stream }]} volumes={{}} onBlocked={() => {}} />);
+    const chamadasIniciais = play.mock.calls.length;
+
+    // A tela re-renderiza várias vezes por segundo por causa das métricas da
+    // chamada e do nível do microfone. Antes, cada render reatribuía o srcObject
+    // e chamava play() de novo, picotando a voz de todo mundo.
+    for (let i = 0; i < 5; i += 1) {
+      rerender(<CallAudioSink streams={[{ socketId: "a", stream }]} volumes={{}} onBlocked={() => {}} />);
+    }
+
+    expect(play.mock.calls.length).toBe(chamadasIniciais);
+    play.mockRestore();
+    paused.mockRestore();
+  });
+
+  it("AbortError não é tratado como autoplay bloqueado", async () => {
+    const onBlocked = vi.fn();
+    const play = vi.spyOn(window.HTMLMediaElement.prototype, "play")
+      .mockRejectedValue(new DOMException("interrompido", "AbortError"));
+    render(<CallAudioSink streams={[{ socketId: "a", stream: fakeStream() }]} volumes={{}} onBlocked={onBlocked} />);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    // Uma reprodução substituída por outra não deve acender o aviso de bloqueio,
+    // que antes deixava o elemento parado de vez.
+    expect(onBlocked).not.toHaveBeenCalledWith(true);
+    play.mockRestore();
+  });
+});

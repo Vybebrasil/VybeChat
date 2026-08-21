@@ -18,7 +18,12 @@ import { METER_FLOOR_DB, sensitivityToDb, toDbfs, toMeterPercent } from "./mic-p
 export const DEFAULT_GATE_THRESHOLD_DB = -50;
 /** Quanto tempo continua aberto depois da última fala, para não cortar sílabas. */
 export const GATE_HOLD_MS = 900;
-const SAMPLE_INTERVAL_MS = 80;
+// 80 ms era lento demais: o portao podia demorar a abrir e comer o inicio da
+// palavra. Amostrando mais rapido, a abertura acompanha a fala.
+const SAMPLE_INTERVAL_MS = 25;
+// A barra nao precisa de 40 quadros por segundo, e cada atualizacao re-renderiza
+// a chamada inteira.
+const LEVEL_REPORT_MS = 70;
 
 /** `level` e `threshold` em dBFS, a mesma escala mostrada na barra. */
 export function shouldGateOpen(options: { level: number; threshold: number; lastVoiceAt: number; now: number }) {
@@ -63,6 +68,12 @@ export function createNoiseGate({ stream, getThreshold, isEnabled, onChange, onL
   const samples = new Uint8Array(analyser.frequencyBinCount);
   let lastVoiceAt = 0;
   let open = true;
+  let lastReportAt = 0;
+  const reportar = (percent: number, now: number) => {
+    if (now - lastReportAt < LEVEL_REPORT_MS) return;
+    lastReportAt = now;
+    onLevel?.(percent);
+  };
 
   const timer = window.setInterval(() => {
     if (!isEnabled()) return;
@@ -71,15 +82,15 @@ export function createNoiseGate({ stream, getThreshold, isEnabled, onChange, onL
     // barra continua viva para a pessoa enxergar o próprio nível.
     if (threshold <= METER_FLOOR_DB) {
       analyser.getByteTimeDomainData(samples);
-      onLevel?.(toMeterPercent(getAudioLevel(samples)));
+      reportar(toMeterPercent(getAudioLevel(samples)), Date.now());
       if (!open) { open = true; track.enabled = true; onChange?.(true); }
       return;
     }
     analyser.getByteTimeDomainData(samples);
     const rms = getAudioLevel(samples);
-    onLevel?.(toMeterPercent(rms));
-    const level = toDbfs(rms);
     const now = Date.now();
+    reportar(toMeterPercent(rms), now);
+    const level = toDbfs(rms);
     if (level >= threshold) lastVoiceAt = now;
     const next = shouldGateOpen({ level, threshold, lastVoiceAt, now });
     if (next === open) return;

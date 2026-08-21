@@ -43,6 +43,7 @@ type CallPeer = { socketId: string; name: string };
 const PROFILE_KEY = "vybechat-cloudflare-profile";
 const WORKSPACE_CODE_KEY = "vybechat-workspace-code";
 const GATE_KEY = "vybechat-gate-sensitivity";
+const GATE_SCALE_KEY = "vybechat-gate-scale";
 
 function initials(name: string) {
   return name.split(" ").map(part => part[0]).slice(0, 2).join("").toUpperCase() || "V";
@@ -103,8 +104,23 @@ export default function CloudflareHome() {
   const [pushToTalkEnabled, setPushToTalkEnabled] = useState(false);
   // Sensibilidade do portao de ruido, de 0 (desligado) a 100. O padrao ja corta
   // fundo constante sem atrapalhar a fala.
+  // Desligado por padrao. O portao corta som de fundo, mas tambem pode comer o
+  // inicio das palavras — e ser ouvido importa mais do que cortar ruido. Quem
+  // tem ambiente barulhento liga na barra. O navegador ja faz supressao de ruido
+  // e isolamento de voz por conta propria.
   const [gateSensitivity, setGateSensitivity] = useState(() => {
-    try { return Number(localStorage.getItem(GATE_KEY) ?? 18); } catch { return 18; }
+    try {
+      // A escala mudou de linear para decibeis: um "45" guardado antes virava um
+      // corte agressivo demais e cortava fala normal. Zera uma vez.
+      if (localStorage.getItem(GATE_SCALE_KEY) !== "db") {
+        localStorage.setItem(GATE_SCALE_KEY, "db");
+        localStorage.setItem(GATE_KEY, "0");
+        return 0;
+      }
+      return Number(localStorage.getItem(GATE_KEY) ?? 0);
+    } catch {
+      return 0;
+    }
   });
   const [pushToTalkKey, setPushToTalkKey] = useState<"Space" | "KeyV">("Space");
   const [isTransmitting, setIsTransmitting] = useState(false);
