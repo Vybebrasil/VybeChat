@@ -59,12 +59,26 @@ describe("CallStage", () => {
     Object.defineProperty(HTMLElement.prototype, "requestFullscreen", { configurable: true, value: requestFullscreen });
     Object.defineProperty(document, "exitFullscreen", { configurable: true, value: exitFullscreen });
     render(<CallStage {...commonProps} participants={participants} />);
-    fireEvent.click(screen.getByRole("button", { name: "Abrir em tela cheia" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver em tela cheia" }));
     expect(requestFullscreen).toHaveBeenCalledOnce();
     cleanup();
     Object.defineProperty(document, "fullscreenElement", { configurable: true, value: document.body });
     render(<CallStage {...commonProps} participants={participants} />);
     fireEvent.click(screen.getByRole("button", { name: "Sair da tela cheia" }));
     expect(exitFullscreen).toHaveBeenCalledOnce();
+  });
+});
+
+describe("tela cheia só do que está em foco", () => {
+  it("duplo clique no quadro entra em tela cheia, como no Discord", () => {
+    const pedido = vi.fn();
+    const { container } = render(<CallStage {...commonProps} participants={participants} />);
+    const quadro = container.querySelector('main > div');
+    expect(quadro).toBeTruthy();
+    Object.defineProperty(quadro, "requestFullscreen", { value: pedido, configurable: true });
+    fireEvent.doubleClick(quadro as Element);
+    // O alvo é o quadro em foco, não o palco inteiro: antes a tela cheia levava
+    // cabeçalho, miniaturas e rodapé junto.
+    expect(pedido).toHaveBeenCalled();
   });
 });
