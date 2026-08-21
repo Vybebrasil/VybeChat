@@ -2,25 +2,15 @@ import { canInvite, canManagePermissions, canModerate, canPost, normalizePermiss
 import { loadRoster, MONDAY_PREFIX, parseIdList } from "./roster.js";
 import { collectChannelIds, DEFAULT_WORKSPACE, loadWorkspace, sanitizeWorkspace, WORKSPACE_KEY } from "./workspace.js";
 
-const CHANNEL_IDS = Array.from({ length: 17 }, (_, index) => index + 1);
 
 function json(type, payload) {
   return JSON.stringify({ type, payload });
 }
 
-// Os ids validos vem da estrutura de canais da equipe, que agora e editavel.
-// Guardados em memoria porque handleEvent e sincrono na validacao.
-let channelIdCache = collectChannelIds(DEFAULT_WORKSPACE);
+// Antes qualquer id ate 99 era gravavel, mas a busca so varria uma faixa fixa:
+// dava para escrever em canais fantasma que a interface nunca mostra. Agora os
+// ids validos vem da estrutura de canais, que e editavel.
 
-function setChannelIdCache(workspace) {
-  channelIdCache = collectChannelIds(workspace);
-}
-
-// Antes qualquer id ate 99 era gravavel, mas a busca so varria CHANNEL_IDS:
-// dava para escrever em canais fantasma que a interface nunca mostra.
-function validChannelId(value) {
-  return Number.isInteger(value) && channelIdCache.has(value);
-}
 
 function validStatus(value) {
   return ["online", "away", "offline", "focus", "meeting"].includes(value);
@@ -138,6 +128,13 @@ export class VybeChatRoom {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
+    // Por instancia, e nao no modulo: um mesmo isolate pode atender salas
+    // diferentes, e um teste contaminava o seguinte.
+    this.channelIds = collectChannelIds(DEFAULT_WORKSPACE);
+  }
+
+  validChannelId(value) {
+    return Number.isInteger(value) && this.channelIds.has(value);
   }
 
   async fetch(request) {
@@ -322,7 +319,7 @@ export class VybeChatRoom {
       this.setState(socket, { userId, name: String(payload.name ?? "Operador Vybe").slice(0, 80), photo: String(payload.photo ?? "").slice(0, 400), status: validStatus(payload.status) ? payload.status : "online", statusMessage: String(payload.statusMessage ?? "").slice(0, 120), role: normalizeRole(storedRole ?? roleForUser(userId, this.env)) });
       // O cliente precisa do proprio socketId para resolver colisao de ofertas
       // na chamada sem trocar mensagem extra entre os pares.
-      setChannelIdCache(await loadWorkspace(this.ctx.storage));
+      this.channelIds = collectChannelIds(await loadWorkspace(this.ctx.storage));
       socket.send(json("session:ready", { socketId: state.socketId }));
       socket.send(json("voice:rooms", this.voiceRooms()));
       this.broadcastPresence();
@@ -345,7 +342,7 @@ export class VybeChatRoom {
       return;
     }
 
-    if (type === "channel:join" && validChannelId(payload.channelId)) {
+    if (type === "channel:join" && this.validChannelId(payload.channelId)) {
       const history = await this.getHistory(payload.channelId);
       socket.send(json("message:history", { channelId: payload.channelId, messages: history }));
       socket.send(json("message:pins", { channelId: payload.channelId, pinnedIds: (await this.ctx.storage.get(`pins:${payload.channelId}`)) ?? [] }));
@@ -353,7 +350,7 @@ export class VybeChatRoom {
       return;
     }
 
-    if (type === "channel:permissions:update" && validChannelId(payload.channelId)) {
+    if (type === "channel:permissions:update" && this.validChannelId(payload.channelId)) {
       if (!canManagePermissions(state.role)) return socket.send(json("realtime:error", { message: "Apenas administradores podem alterar permissões da sala." }));
       const permissions = normalizePermissions(payload);
       await this.ctx.storage.put(`permissions:${payload.channelId}`, permissions);
@@ -411,7 +408,7 @@ export class VybeChatRoom {
 
     if (type === "workspace:list") {
       const workspace = await loadWorkspace(this.ctx.storage);
-      setChannelIdCache(workspace);
+      this.channelIds = collectChannelIds(workspace);
       socket.send(json("workspace:list", { workspace }));
       return;
     }
@@ -425,7 +422,7 @@ export class VybeChatRoom {
         return socket.send(json("realtime:error", { message: "Estrutura de canais inválida." }));
       }
       await this.ctx.storage.put(WORKSPACE_KEY, workspace);
-      setChannelIdCache(workspace);
+      this.channelIds = collectChannelIds(workspace);
       // Todo mundo recebe na hora: sem isso metade da equipe ficaria vendo
       // canais que nao existem mais.
       this.broadcast("workspace:list", { workspace });
@@ -458,7 +455,7 @@ export class VybeChatRoom {
     }
 
     if (type === "message:new") {
-      if (!validChannelId(payload.channelId) || typeof payload.content !== "string" || !payload.content.trim() || !state.userId) return;
+      if (!this.validChannelId(payload.channelId) || typeof payload.content !== "string" || !payload.content.trim() || !state.userId) return;
       const channelId = payload.channelId;
       const permissions = normalizePermissions((await this.ctx.storage.get(`permissions:${channelId}`)) ?? {});
       if (!canPost(state.role, permissions)) return socket.send(json("realtime:error", { message: "Este canal está em modo somente leitura." }));
@@ -471,7 +468,7 @@ export class VybeChatRoom {
     }
 
     if (type === "message:edit") {
-      if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string" || typeof payload.content !== "string") return;
+      if (!this.validChannelId(payload.channelId) || typeof payload.messageId !== "string" || typeof payload.content !== "string") return;
       const content = payload.content.trim().slice(0, 4000);
       if (!content) return;
       const history = await this.getHistory(payload.channelId);
@@ -489,7 +486,7 @@ export class VybeChatRoom {
     }
 
     if (type === "message:delete") {
-      if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string") return;
+      if (!this.validChannelId(payload.channelId) || typeof payload.messageId !== "string") return;
       const history = await this.getHistory(payload.channelId);
       const message = history.find(item => item.id === payload.messageId);
       if (!message) return;
@@ -511,7 +508,7 @@ export class VybeChatRoom {
     }
 
     if (type === "message:reaction") {
-      if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string" || typeof payload.emoji !== "string" || !state.userId) return;
+      if (!this.validChannelId(payload.channelId) || typeof payload.messageId !== "string" || typeof payload.emoji !== "string" || !state.userId) return;
       const emoji = payload.emoji.slice(0, 16);
       const history = await this.getHistory(payload.channelId);
       const message = history.find(item => item.id === payload.messageId);
@@ -527,7 +524,7 @@ export class VybeChatRoom {
     }
 
     if (type === "message:pin") {
-      if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string") return;
+      if (!this.validChannelId(payload.channelId) || typeof payload.messageId !== "string") return;
       if (!canModerate(state.role)) return socket.send(json("realtime:error", { message: "Apenas moderadores podem fixar decisões." }));
       const history = await this.getHistory(payload.channelId);
       if (!history.some(message => message.id === payload.messageId)) return;
@@ -543,7 +540,9 @@ export class VybeChatRoom {
     if (type === "message:search" && typeof payload.query === "string") {
       const query = payload.query.trim().toLocaleLowerCase();
       if (!query) return socket.send(json("message:search-results", { query: "", results: [] }));
-      const channels = validChannelId(payload.channelId) ? [payload.channelId] : CHANNEL_IDS;
+      // A busca varria uma faixa fixa de ids. Com canais editaveis, qualquer
+      // canal criado depois ficaria invisivel para a busca.
+      const channels = this.validChannelId(payload.channelId) ? [payload.channelId] : Array.from(this.channelIds);
       const results = [];
       for (const channelId of channels) {
         const history = await this.getHistory(channelId);
@@ -553,12 +552,12 @@ export class VybeChatRoom {
       return;
     }
 
-    if (type === "typing" && validChannelId(payload.channelId)) {
+    if (type === "typing" && this.validChannelId(payload.channelId)) {
       this.broadcast("typing", { channelId: payload.channelId, name: state.name, active: Boolean(payload.active) }, socket);
       return;
     }
 
-    if (type === "call:invite" && validChannelId(payload.channelId) && typeof payload.userId === "string") {
+    if (type === "call:invite" && this.validChannelId(payload.channelId) && typeof payload.userId === "string") {
       const permissions = normalizePermissions((await this.ctx.storage.get(`permissions:${payload.channelId}`)) ?? {});
       if (!canInvite(state.role, permissions)) return socket.send(json("realtime:error", { message: "Apenas administradores podem convidar para esta sala." }));
       const target = this.findUserSocket(payload.userId);
@@ -567,7 +566,7 @@ export class VybeChatRoom {
     }
 
     if (type === "call:join") {
-      if (!validChannelId(payload.channelId)) return;
+      if (!this.validChannelId(payload.channelId)) return;
       this.leaveCall(socket);
       const next = this.setState(socket, { callChannelId: payload.channelId, isMuted: false, isSpeaking: false, handRaised: false });
       socket.send(json("call:peers", { channelId: payload.channelId, peers: this.peers(payload.channelId, next.socketId) }));
@@ -595,21 +594,21 @@ export class VybeChatRoom {
     }
 
     if (type === "call:leave") { this.leaveCall(socket); return; }
-    if (type === "call:audio-state" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
+    if (type === "call:audio-state" && this.validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
       this.setState(socket, { isMuted: Boolean(payload.isMuted), isSpeaking: Boolean(payload.isMuted) ? false : Boolean(payload.isSpeaking) });
       this.broadcast("voice:rooms", this.voiceRooms());
       return;
     }
-    if (type === "call:hand-raise" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
+    if (type === "call:hand-raise" && this.validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
       this.setState(socket, { handRaised: Boolean(payload.active) });
       this.broadcast("voice:rooms", this.voiceRooms());
       return;
     }
-    if (type === "call:screen-share" && validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
+    if (type === "call:screen-share" && this.validChannelId(payload.channelId) && state.callChannelId === payload.channelId) {
       this.broadcastToCall(payload.channelId, "call:screen-share", { channelId: payload.channelId, socketId: payload.active ? state.socketId : null, name: payload.active ? state.name : null });
       return;
     }
-    if (["call:offer", "call:answer", "call:ice"].includes(type) && validChannelId(payload.channelId) && typeof payload.to === "string") {
+    if (["call:offer", "call:answer", "call:ice"].includes(type) && this.validChannelId(payload.channelId) && typeof payload.to === "string") {
       const target = this.findSocket(payload.to);
       if (!target) return;
       const body = { ...payload, from: state.socketId, user: { userId: state.userId, name: state.name, status: state.status } };

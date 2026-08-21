@@ -226,6 +226,19 @@ describe("VybeChatRoom collaboration integration", () => {
     expect(member.deserializeAttachment().isMuted).toBeFalsy();
   });
 
+  it("a busca encontra mensagem em canal criado depois", async () => {
+    const { room, admin } = setup();
+    await room.handleEvent(admin, "workspace:update", { workspace: [
+      { name: "OPERACAO", channels: [{ id: 1, name: "geral", type: "text" }] },
+      { name: "NOVA", channels: [{ id: 90, name: "clientes", type: "text" }] },
+    ] });
+    await room.handleEvent(admin, "message:new", { channelId: 90, content: "briefing do cliente novo" });
+    await room.handleEvent(admin, "message:search", { query: "briefing" });
+    // A busca varria uma faixa fixa de ids: canal criado depois ficava invisível.
+    const resultado = packets(admin).filter(p => p.type === "message:search-results").pop();
+    expect(resultado?.payload.results).toHaveLength(1);
+  });
+
   it("persists direct messages, emits them to the recipient and clears the local unread counter", async () => {
     const { room, storage, admin, member } = setup();
     await room.handleEvent(admin, "direct:new", { toUserId: "member@vybe.com", toName: "Member", content: "Pode revisar a entrega?" });
