@@ -439,6 +439,46 @@ export class VybeChatRoom {
       return;
     }
 
+    if (type === "message:edit") {
+      if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string" || typeof payload.content !== "string") return;
+      const content = payload.content.trim().slice(0, 4000);
+      if (!content) return;
+      const history = await this.getHistory(payload.channelId);
+      const message = history.find(item => item.id === payload.messageId);
+      if (!message) return;
+      // So o autor edita. Nem moderador reescreve a fala de outra pessoa.
+      if (message.userId !== state.userId) {
+        return socket.send(json("realtime:error", { message: "Você só pode editar as suas mensagens." }));
+      }
+      message.content = content;
+      message.editedAt = new Date().toISOString();
+      await this.putHistory(payload.channelId, history);
+      this.broadcast("message:update", { channelId: payload.channelId, message });
+      return;
+    }
+
+    if (type === "message:delete") {
+      if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string") return;
+      const history = await this.getHistory(payload.channelId);
+      const message = history.find(item => item.id === payload.messageId);
+      if (!message) return;
+      // O autor apaga a propria; moderador apaga qualquer uma.
+      if (message.userId !== state.userId && !canModerate(state.role)) {
+        return socket.send(json("realtime:error", { message: "Apenas o autor ou um moderador pode apagar esta mensagem." }));
+      }
+      // As respostas da thread perderiam o pai e sumiriam da conversa.
+      const removidos = new Set([message.id, ...history.filter(item => item.parentId === message.id).map(item => item.id)]);
+      await this.putHistory(payload.channelId, history.filter(item => !removidos.has(item.id)));
+      const pins = new Set((await this.ctx.storage.get(`pins:${payload.channelId}`)) ?? []);
+      if (Array.from(removidos).some(id => pins.has(id))) {
+        const pinnedIds = Array.from(pins).filter(id => !removidos.has(id));
+        await this.ctx.storage.put(`pins:${payload.channelId}`, pinnedIds);
+        this.broadcast("message:pins", { channelId: payload.channelId, pinnedIds });
+      }
+      this.broadcast("message:removed", { channelId: payload.channelId, messageIds: Array.from(removidos) });
+      return;
+    }
+
     if (type === "message:reaction") {
       if (!validChannelId(payload.channelId) || typeof payload.messageId !== "string" || typeof payload.emoji !== "string" || !state.userId) return;
       const emoji = payload.emoji.slice(0, 16);

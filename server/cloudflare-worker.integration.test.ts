@@ -141,6 +141,63 @@ describe("VybeChatRoom collaboration integration", () => {
     expect(naSala6).toHaveLength(0);
   });
 
+  it("o autor edita a própria mensagem e o texto novo chega a todos", async () => {
+    const { room, storage, admin } = setup();
+    await room.handleEvent(admin, "message:new", { channelId: 1, content: "versão errada" });
+    const [msg] = (await storage.get("messages:1")) as Array<{ id: string }>;
+    await room.handleEvent(admin, "message:edit", { channelId: 1, messageId: msg.id, content: "versão corrigida" });
+    const historico = (await storage.get("messages:1")) as Array<{ content: string; editedAt?: string }>;
+    expect(historico[0].content).toBe("versão corrigida");
+    expect(historico[0].editedAt).toBeTruthy();
+  });
+
+  it("ninguém reescreve a fala de outra pessoa, nem moderador", async () => {
+    const { room, storage, admin, member } = setup();
+    await room.handleEvent(member, "message:new", { channelId: 1, content: "minha mensagem" });
+    const [msg] = (await storage.get("messages:1")) as Array<{ id: string }>;
+    // `admin` é administrador e ainda assim não pode: editar é só do autor.
+    await room.handleEvent(admin, "message:edit", { channelId: 1, messageId: msg.id, content: "texto trocado" });
+    expect(((await storage.get("messages:1")) as Array<{ content: string }>)[0].content).toBe("minha mensagem");
+    expect(packets(admin).at(-1)).toMatchObject({ type: "realtime:error" });
+  });
+
+  it("apagar leva junto as respostas da thread", async () => {
+    const { room, storage, admin, member } = setup();
+    await room.handleEvent(admin, "message:new", { channelId: 1, content: "pergunta" });
+    const [raiz] = (await storage.get("messages:1")) as Array<{ id: string }>;
+    await room.handleEvent(member, "message:new", { channelId: 1, content: "resposta", parentId: raiz.id });
+    await room.handleEvent(admin, "message:delete", { channelId: 1, messageId: raiz.id });
+    // Sem isso a resposta ficaria órfã, visível e sem contexto nenhum.
+    expect(await storage.get("messages:1")).toEqual([]);
+    expect(packets(member).at(-1)).toMatchObject({ type: "message:removed" });
+  });
+
+  it("moderador apaga mensagem de outra pessoa", async () => {
+    const { room, storage, admin, member } = setup();
+    await room.handleEvent(member, "message:new", { channelId: 1, content: "fora de hora" });
+    const [msg] = (await storage.get("messages:1")) as Array<{ id: string }>;
+    await room.handleEvent(admin, "message:delete", { channelId: 1, messageId: msg.id });
+    expect(await storage.get("messages:1")).toEqual([]);
+  });
+
+  it("quem não é autor nem moderador não apaga", async () => {
+    const { room, storage, admin, member } = setup();
+    await room.handleEvent(admin, "message:new", { channelId: 1, content: "do admin" });
+    const [msg] = (await storage.get("messages:1")) as Array<{ id: string }>;
+    await room.handleEvent(member, "message:delete", { channelId: 1, messageId: msg.id });
+    expect((await storage.get("messages:1")) as unknown[]).toHaveLength(1);
+  });
+
+  it("apagar uma mensagem fixada tira ela dos fixados", async () => {
+    const { room, storage, admin } = setup();
+    await room.handleEvent(admin, "message:new", { channelId: 1, content: "decisão" });
+    const [msg] = (await storage.get("messages:1")) as Array<{ id: string }>;
+    await room.handleEvent(admin, "message:pin", { channelId: 1, messageId: msg.id });
+    await room.handleEvent(admin, "message:delete", { channelId: 1, messageId: msg.id });
+    // Um fixado apontando para mensagem inexistente ficaria preso na lateral.
+    expect(await storage.get("pins:1")).toEqual([]);
+  });
+
   it("persists direct messages, emits them to the recipient and clears the local unread counter", async () => {
     const { room, storage, admin, member } = setup();
     await room.handleEvent(admin, "direct:new", { toUserId: "member@vybe.com", toName: "Member", content: "Pode revisar a entrega?" });
