@@ -808,7 +808,8 @@ export default function CloudflareHome() {
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
       setScreenStream(null);
       setScreenSharer(null);
-    setScreenSharerId(null);
+      setScreenSharerId(null);
+      setNotice("Você parou de compartilhar a tela.");
       return;
     }
     try {
@@ -843,6 +844,10 @@ export default function CloudflareHome() {
       }));
       setScreenStream(stream);
       setScreenSharer(profile?.name ?? "Você");
+      // Compartilhar pela barra lateral nao mudava nada na tela de quem
+      // compartilha: sem ver a propria transmissao, parecia que nao funcionou.
+      setCallStageOpen(true);
+      setNotice("Você está compartilhando sua tela. Toque em “Parar transmissão” para encerrar.");
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: true });
       track.onended = () => {
         const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;

@@ -60,6 +60,10 @@ export function CallStage({
   onMinimize,
 }: CallStageProps) {
   const stageRef = useRef<HTMLElement>(null);
+  // Tela cheia do quadro em foco, e nao do palco inteiro: antes ela levava
+  // cabecalho, miniaturas e rodape junto, entao nunca dava para ver so a tela de
+  // quem esta compartilhando.
+  const focoRef = useRef<HTMLDivElement>(null);
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [view, setView] = useState<CallStageView>("stage");
@@ -90,7 +94,8 @@ export function CallStage({
   }, []);
 
   const toggleFullscreen = async () => {
-    const element = stageRef.current as FullscreenElementLike | null;
+    // Prioriza o quadro em foco; o palco inteiro so entra se ele nao existir.
+    const element = (focoRef.current ?? stageRef.current) as FullscreenElementLike | null;
     if (!element) return;
     await toggleDocumentFullscreen(document as FullscreenDocumentLike, element);
   };
@@ -106,13 +111,14 @@ export function CallStage({
         <span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex ${microphoneOn ? "bg-emerald-400/10 text-emerald-200" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${microphoneOn ? "bg-emerald-400" : "bg-rose-400"}`} />{microphoneOn ? "Microfone ativo" : "Microfone pausado"}</span><span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold lg:flex ${callQuality === "Conexão estável" ? "bg-emerald-400/10 text-emerald-200" : callQuality === "Conectando mídia" ? "bg-orange-400/10 text-orange-100" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${callQuality === "Conexão estável" ? "bg-emerald-400" : callQuality === "Conectando mídia" ? "bg-orange-300" : "bg-rose-400"}`} />{callQuality}</span>
         <button onClick={() => setRosterOpen(current => !current)} className={`grid size-9 place-items-center rounded-lg border text-xs font-bold transition-colors ${rosterOpen ? "border-orange-300/50 bg-orange-400/15 text-orange-100" : "border-white/10 bg-white/5 text-stone-200 hover:bg-white/10"}`} aria-label={rosterOpen ? "Fechar participantes" : "Abrir participantes"}>{participants.length}</button>
         <button onClick={() => setView(getNextCallStageView)} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label={view === "stage" ? "Abrir grade de participantes" : "Abrir palco principal"}>{view === "stage" ? <Grid2X2 className="size-4" /> : <MonitorUp className="size-4" />}</button>
-        <button onClick={toggleFullscreen} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"} aria-label={isFullscreen ? "Sair da tela cheia" : "Abrir em tela cheia"}>{isFullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}</button>
+        
         <button onClick={onMinimize} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label="Minimizar chamada"><Minimize2 className="size-4" /></button>
       </header>
 
       <main className="relative flex min-h-0 flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-5">
-        {view === "stage" ? <><div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/70 shadow-[0_0_55px_rgba(0,0,0,.55)]">
+        {view === "stage" ? <><div ref={focoRef} onDoubleClick={toggleFullscreen} className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/70 shadow-[0_0_55px_rgba(0,0,0,.55)]">
           <MediaTile {...selected} sharingScreen={selected.sharingScreen} className="h-full min-h-0 rounded-none border-0" selected />
+          <button onClick={toggleFullscreen} title={isFullscreen ? "Sair da tela cheia" : "Tela cheia (ou toque duas vezes)"} aria-label={isFullscreen ? "Sair da tela cheia" : "Ver em tela cheia"} className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-white/10">{isFullscreen ? <Shrink className="size-3.5" /> : <Expand className="size-3.5" />}{isFullscreen ? "Sair" : "Tela cheia"}</button>
           <button onClick={() => setPinnedId(current => togglePinnedParticipant(current, selected.id))} className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-white/10"><Pin className="size-3.5" />{pinnedId === selected.id ? "Fixado" : "Fixar"}</button>
         </div>
         {thumbnails.length > 0 && <div className="flex max-h-[23vh] shrink-0 gap-2 overflow-x-auto pb-1 sm:gap-3">
