@@ -220,6 +220,12 @@ export default function CloudflareHome() {
       }
     };
     if (shouldOffer && activeCallRef.current) {
+      // Em modo de escuta nao ha track local nenhum. Sem isto a oferta sairia
+      // sem linhas de midia e a pessoa nao ouviria ninguem.
+      if (!connection.getSenders().some(sender => sender.track)) {
+        connection.addTransceiver("audio", { direction: "recvonly" });
+        connection.addTransceiver("video", { direction: "recvonly" });
+      }
       const negotiation = negotiationRef.current.get(peerId)!;
       try {
         negotiation.makingOffer = true;
@@ -580,7 +586,8 @@ export default function CloudflareHome() {
       setLocalStream(stream);
       setActiveCallChannelId(channelId);
       setSelectedChannelId(channelId);
-      setMicrophoneOn(true);
+      const somenteEscuta = mode === "listen-only";
+      setMicrophoneOn(!somenteEscuta);
       // Entrar numa sala nao deve colocar sua camera no ar sem voce pedir. O
       // track e capturado, mas fica desligado ate clicarem em "Ligar camera" —
       // assim nao ha renegociacao depois, e portanto nenhuma colisao de oferta.
@@ -588,7 +595,7 @@ export default function CloudflareHome() {
       setCameraOn(false);
       setSelectedAudioInput(selection.audioInputId ?? "");
       setHandRaised(false);
-      setNotice(mode === "audio-only" ? "Você entrou somente por áudio." : null);
+      setNotice(somenteEscuta ? "Nenhum microfone disponível: você entrou só para ouvir. Conecte um microfone e entre de novo para falar." : mode === "audio-only" ? "Você entrou somente por áudio." : null);
       setCallStageOpen(false);
       setMobileSidebarOpen(false);
       socketRef.current.emit("call:join", { channelId });
@@ -603,8 +610,11 @@ export default function CloudflareHome() {
   };
 
   const toggleMic = () => {
+    if (!localStreamRef.current?.getAudioTracks().length) {
+      return setNotice("Você está só ouvindo: nenhum microfone foi encontrado neste dispositivo.");
+    }
     const next = !microphoneOn;
-    localStreamRef.current?.getAudioTracks().forEach(track => { track.enabled = next; });
+    localStreamRef.current.getAudioTracks().forEach(track => { track.enabled = next; });
     setMicrophoneOn(next);
     if (activeCallRef.current) socketRef.current.emit("call:audio-state", { channelId: activeCallRef.current, isMuted: !next, isSpeaking: false });
   };
