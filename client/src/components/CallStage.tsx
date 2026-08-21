@@ -1,6 +1,7 @@
-import { Grid2X2, Hand, Mic, MicOff, Minimize2, MonitorUp, Phone, Pin, Video, VideoOff, Volume2 } from "lucide-react";
+import { Expand, Grid2X2, Hand, Mic, MicOff, Minimize2, MonitorUp, Phone, Pin, Shrink, Video, VideoOff, Volume2 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getStageTile, getThumbnailTiles, type CallStageTile as CallStageTileState } from "@/lib/call-stage";
+import { resolveStageFocus } from "@/lib/screen-share";
 import { getNextCallStageView, togglePinnedParticipant, type CallStageView } from "@/lib/call-stage-ui";
 import { MediaTile } from "@/components/MediaTile";
 import { MicSensitivityMeter } from "@/components/MicSensitivityMeter";
@@ -63,7 +64,11 @@ export function CallStage({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [view, setView] = useState<CallStageView>("stage");
   const [rosterOpen, setRosterOpen] = useState(false);
-  const selected = useMemo(() => getStageTile(participants, pinnedId), [participants, pinnedId]);
+  // Quem esta compartilhando vai para o centro sem ninguem precisar clicar. Antes
+  // a tela ficava numa miniatura ate cada pessoa fixar na mao, e ninguem fixava.
+  const compartilhando = participants.find(item => item.sharingScreen)?.id ?? null;
+  const foco = resolveStageFocus({ pinnedId, sharingId: compartilhando });
+  const selected = useMemo(() => getStageTile(participants, foco), [participants, foco]);
   const thumbnails = useMemo(() => getThumbnailTiles(participants, selected?.id ?? null), [participants, selected?.id]);
   const callQuality = Object.values(diagnostics).some(item => item.quality === "recovering") ? "Recuperando conexão" : Object.values(diagnostics).some(item => item.quality === "degraded") ? "Conexão instável" : Object.values(diagnostics).some(item => item.quality === "connecting") ? "Conectando mídia" : "Conexão estável";
 
@@ -101,7 +106,7 @@ export function CallStage({
         <span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex ${microphoneOn ? "bg-emerald-400/10 text-emerald-200" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${microphoneOn ? "bg-emerald-400" : "bg-rose-400"}`} />{microphoneOn ? "Microfone ativo" : "Microfone pausado"}</span><span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold lg:flex ${callQuality === "Conexão estável" ? "bg-emerald-400/10 text-emerald-200" : callQuality === "Conectando mídia" ? "bg-orange-400/10 text-orange-100" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${callQuality === "Conexão estável" ? "bg-emerald-400" : callQuality === "Conectando mídia" ? "bg-orange-300" : "bg-rose-400"}`} />{callQuality}</span>
         <button onClick={() => setRosterOpen(current => !current)} className={`grid size-9 place-items-center rounded-lg border text-xs font-bold transition-colors ${rosterOpen ? "border-orange-300/50 bg-orange-400/15 text-orange-100" : "border-white/10 bg-white/5 text-stone-200 hover:bg-white/10"}`} aria-label={rosterOpen ? "Fechar participantes" : "Abrir participantes"}>{participants.length}</button>
         <button onClick={() => setView(getNextCallStageView)} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label={view === "stage" ? "Abrir grade de participantes" : "Abrir palco principal"}>{view === "stage" ? <Grid2X2 className="size-4" /> : <MonitorUp className="size-4" />}</button>
-        <button onClick={toggleFullscreen} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label={isFullscreen ? "Sair da tela cheia" : "Abrir em tela cheia"}>{isFullscreen ? <Minimize2 className="size-4" /> : <Pin className="size-4" />}</button>
+        <button onClick={toggleFullscreen} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"} aria-label={isFullscreen ? "Sair da tela cheia" : "Abrir em tela cheia"}>{isFullscreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}</button>
         <button onClick={onMinimize} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label="Minimizar chamada"><Minimize2 className="size-4" /></button>
       </header>
 
