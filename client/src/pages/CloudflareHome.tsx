@@ -14,13 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getSelectedAudioTrack, listAudioInputs, type AudioInput } from "@/lib/audio-input";
-import { getCallMedia, getCallMediaErrorMessage, type CallDeviceSelection } from "@/lib/call-media";
+import { getCallMedia, getCallMediaErrorMessage, getCameraTrack, type CallDeviceSelection } from "@/lib/call-media";
 import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
 import { EXTERNAL_WORKSPACE, findExternalChannel } from "@/lib/external-workspace";
 import { drainIceCandidates, queueIceCandidate, type PendingIceCandidates } from "@/lib/ice-candidates";
 import { CallAudioSink } from "@/components/CallAudioSink";
 import { createSpeakingDetector } from "@/lib/speaking-detector";
 import { getIceServers } from "@/lib/ice-config";
+import { attachLocalMedia } from "@/lib/peer-media";
 import { DISCONNECTED_GRACE_MS, isPolitePeer, shouldIgnoreOffer, shouldRestartIce, shouldScheduleRestart, type NegotiationState } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
@@ -121,6 +122,11 @@ export default function CloudflareHome() {
   const localSocketIdRef = useRef("");
   const negotiationRef = useRef(new Map<string, NegotiationState>());
   const restartTimersRef = useRef(new Map<string, number>());
+  // Sender de video de cada par, guardado na criacao. Procura-lo por
+  // `sender.track?.kind` falhava sempre que nao havia track — sem camera, ou
+  // depois de parar um compartilhamento — e caiamos numa renegociacao no meio
+  // da chamada, que era o que derrubava a voz.
+  const videoSendersRef = useRef(new Map<string, RTCRtpSender>());
   const iceServersRef = useRef<RTCIceServer[]>(getIceServers());
   // Lido dentro do efeito de sockets sem entrar nas dependencias: antes trocar de
   // canal de texto durante a chamada re-registrava todos os handlers.
@@ -186,7 +192,8 @@ export default function CloudflareHome() {
     const connection = new RTCPeerConnection({ iceServers: iceServersRef.current });
     peerConnectionsRef.current.set(peerId, connection);
     negotiationRef.current.set(peerId, { makingOffer: false, ignoreOffer: false });
-    localStreamRef.current?.getTracks().forEach(track => connection.addTrack(track, localStreamRef.current!));
+    const videoSender = attachLocalMedia(connection, localStreamRef.current);
+    if (videoSender) videoSendersRef.current.set(peerId, videoSender as RTCRtpSender);
     connection.onicecandidate = event => {
       if (event.candidate && activeCallRef.current) socketRef.current.emit("call:ice", { to: peerId, channelId: activeCallRef.current, candidate: event.candidate });
     };
@@ -220,12 +227,6 @@ export default function CloudflareHome() {
       }
     };
     if (shouldOffer && activeCallRef.current) {
-      // Em modo de escuta nao ha track local nenhum. Sem isto a oferta sairia
-      // sem linhas de midia e a pessoa nao ouviria ninguem.
-      if (!connection.getSenders().some(sender => sender.track)) {
-        connection.addTransceiver("audio", { direction: "recvonly" });
-        connection.addTransceiver("video", { direction: "recvonly" });
-      }
       const negotiation = negotiationRef.current.get(peerId)!;
       try {
         negotiation.makingOffer = true;
@@ -353,6 +354,7 @@ export default function CloudflareHome() {
       peerConnectionsRef.current.delete(socketId);
       pendingIceCandidatesRef.current.delete(socketId);
       negotiationRef.current.delete(socketId);
+      videoSendersRef.current.delete(socketId);
       clearRestartTimer(socketId);
       setRemoteStreams(current => current.filter(item => item.socketId !== socketId));
       setCallPeers(current => {
@@ -562,6 +564,8 @@ export default function CloudflareHome() {
     peerConnectionsRef.current.forEach(peer => peer.close());
     peerConnectionsRef.current.clear();
     pendingIceCandidatesRef.current.clear();
+    videoSendersRef.current.clear();
+    negotiationRef.current.clear();
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     screenStream?.getTracks().forEach(track => track.stop());
     localStreamRef.current = null;
@@ -588,10 +592,8 @@ export default function CloudflareHome() {
       setSelectedChannelId(channelId);
       const somenteEscuta = mode === "listen-only";
       setMicrophoneOn(!somenteEscuta);
-      // Entrar numa sala nao deve colocar sua camera no ar sem voce pedir. O
-      // track e capturado, mas fica desligado ate clicarem em "Ligar camera" —
-      // assim nao ha renegociacao depois, e portanto nenhuma colisao de oferta.
-      stream.getVideoTracks().forEach(track => { track.enabled = false; });
+      // Entrar numa sala nunca liga a camera: o getCallMedia pede so o
+      // microfone, entao a luz nem acende ate alguem clicar em "Ligar camera".
       setCameraOn(false);
       setSelectedAudioInput(selection.audioInputId ?? "");
       setHandRaised(false);
@@ -631,11 +633,34 @@ export default function CloudflareHome() {
     socketRef.current.emit("call:hand-raise", { channelId: activeCallRef.current, active: next });
   };
 
-  const toggleCamera = () => {
-    const track = localStreamRef.current?.getVideoTracks()[0];
-    if (!track) return setNotice("Nenhuma câmera está disponível nesta chamada.");
-    track.enabled = !cameraOn;
-    setCameraOn(!cameraOn);
+  const toggleCamera = async () => {
+    if (!activeCallRef.current) return;
+    if (screenStream) return setNotice("Pare de compartilhar a tela antes de ligar a câmera.");
+
+    const atual = localStreamRef.current?.getVideoTracks()[0];
+    if (cameraOn && atual) {
+      // Desligar de verdade: solta o dispositivo em vez de so silenciar, para a
+      // luz da camera apagar.
+      atual.stop();
+      localStreamRef.current?.removeTrack(atual);
+      videoSendersRef.current.forEach(sender => { void sender.replaceTrack(null).catch(() => undefined); });
+      setLocalStream(localStreamRef.current ? new MediaStream(localStreamRef.current.getTracks()) : null);
+      setCameraOn(false);
+      return;
+    }
+
+    try {
+      // A camera so e ligada agora, a pedido. O sender de video ja existe desde
+      // a criacao da conexao, entao isto e um replaceTrack — sem renegociar.
+      const { track } = await getCameraTrack(navigator.mediaDevices);
+      localStreamRef.current?.addTrack(track);
+      await Promise.all(Array.from(videoSendersRef.current.values()).map(sender => sender.replaceTrack(track).catch(() => undefined)));
+      track.onended = () => { setCameraOn(false); };
+      setLocalStream(localStreamRef.current ? new MediaStream(localStreamRef.current.getTracks()) : new MediaStream([track]));
+      setCameraOn(true);
+    } catch (error) {
+      setNotice(getCallMediaErrorMessage(error));
+    }
   };
 
   const changeAudioInput = async (deviceId: string) => {
@@ -661,7 +686,7 @@ export default function CloudflareHome() {
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
       const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
-      peerConnectionsRef.current.forEach(peer => peer.getSenders().find(sender => sender.track?.kind === "video")?.replaceTrack(cameraTrack));
+      videoSendersRef.current.forEach(sender => { void sender.replaceTrack(cameraTrack).catch(() => undefined); });
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
       setScreenStream(null);
       setScreenSharer(null);
@@ -670,22 +695,20 @@ export default function CloudflareHome() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       const track = stream.getVideoTracks()[0];
-      for (const [peerId, peer] of Array.from(peerConnectionsRef.current.entries())) {
-        const sender = peer.getSenders().find(item => item.track?.kind === "video");
-        if (sender) await sender.replaceTrack(track);
-        else {
-          peer.addTrack(track, stream);
-          const offer = await peer.createOffer();
-          await peer.setLocalDescription(offer);
-          socketRef.current.emit("call:offer", { to: peerId, channelId: activeCallRef.current, offer });
+      await Promise.all(Array.from(videoSendersRef.current.entries()).map(async ([peerId, sender]) => {
+        try {
+          await sender.replaceTrack(track);
+        } catch (error) {
+          // Um par com problema nao pode derrubar o compartilhamento dos outros.
+          console.warn("[VybeChat] nao foi possivel enviar a tela para um participante", { peerId, error });
         }
-      }
+      }));
       setScreenStream(stream);
       setScreenSharer(profile?.name ?? "Você");
       socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: true });
       track.onended = () => {
         const cameraTrack = localStreamRef.current?.getVideoTracks()[0] ?? null;
-        peerConnectionsRef.current.forEach(peer => { void peer.getSenders().find(sender => sender.track?.kind === "video")?.replaceTrack(cameraTrack); });
+        videoSendersRef.current.forEach(sender => { void sender.replaceTrack(cameraTrack).catch(() => undefined); });
         if (activeCallRef.current) socketRef.current.emit("call:screen-share", { channelId: activeCallRef.current, active: false });
         setScreenStream(null);
         setScreenSharer(null);
