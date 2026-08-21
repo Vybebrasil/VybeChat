@@ -49,3 +49,23 @@ export function resolveStageFocus(options: {
   if (options.pinnedId) return options.pinnedId;
   return options.sharingId;
 }
+
+type Previa = { id: string; isLocal?: boolean; sharingScreen?: boolean };
+
+/**
+ * Quem aparece no painel reduzido da chamada.
+ *
+ * Ele mostrava sempre o primeiro participante, que é sempre você — e, com a
+ * câmera desligada, só o seu avatar. Quem compartilhava a tela era recebido
+ * corretamente, mas ninguém via nada sem abrir a tela cheia. Priorizar quem
+ * compartilha, depois qualquer outra pessoa, e só então você.
+ */
+export function pickPreviewParticipant<T extends Previa>(participants: T[]): T | null {
+  if (!participants.length) return null;
+  return (
+    participants.find(item => item.sharingScreen && !item.isLocal) ??
+    participants.find(item => item.sharingScreen) ??
+    participants.find(item => !item.isLocal) ??
+    participants[0]
+  );
+}
