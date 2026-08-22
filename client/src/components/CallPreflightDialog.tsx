@@ -1,10 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getCallConstraints, type CallDeviceSelection } from "@/lib/call-media";
-import { judgePeak, recordMicSample, VERDICT_TEXT, type PreviewVerdict } from "@/lib/mic-preview";
-import { createNoiseGate, sensitivityToThreshold } from "@/lib/noise-gate";
-import { MicSensitivityMeter } from "@/components/MicSensitivityMeter";
-import { AudioLines, CheckCircle2, Loader2, Mic, Play, Video, VideoOff } from "lucide-react";
+import { getLoopbackInputWarning } from "@/lib/voice-focus";
+import { AudioLines, CheckCircle2, Mic, Video, VideoOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type InputDevice = { deviceId: string; label: string };
@@ -14,11 +12,9 @@ type CallPreflightDialogProps = {
   roomName: string;
   onOpenChange: (open: boolean) => void;
   onJoin: (selection: CallDeviceSelection) => void;
-  gateSensitivity: number;
-  onGateSensitivityChange: (value: number) => void;
 };
 
-export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gateSensitivity, onGateSensitivityChange }: CallPreflightDialogProps) {
+export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin }: CallPreflightDialogProps) {
   const [audioInputs, setAudioInputs] = useState<InputDevice[]>([]);
   const [videoInputs, setVideoInputs] = useState<InputDevice[]>([]);
   const [audioInputId, setAudioInputId] = useState("");
@@ -26,32 +22,8 @@ export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gate
   const [status, setStatus] = useState<"idle" | "checking" | "ready" | "error">("idle");
   const [message, setMessage] = useState("Escolha seus dispositivos e teste antes de entrar.");
   const [audioLevel, setAudioLevel] = useState(0);
-  const [peak, setPeak] = useState(0);
-  const [gravando, setGravando] = useState(false);
-  const [previaUrl, setPreviaUrl] = useState("");
   const previewRef = useRef<HTMLVideoElement>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
-  const gateSensitivityRef = useRef(gateSensitivity);
-  useEffect(() => { gateSensitivityRef.current = gateSensitivity; }, [gateSensitivity]);
-
-  const veredito: PreviewVerdict = judgePeak(peak);
-
-  const ouvirMinhaVoz = async () => {
-    const stream = previewStreamRef.current;
-    if (!stream) return setMessage("Toque em “Testar dispositivos” antes de ouvir sua voz.");
-    setGravando(true);
-    setPreviaUrl("");
-    setMessage("Gravando 4 segundos… fale normalmente.");
-    try {
-      const url = await recordMicSample({ stream: new MediaStream(stream.getAudioTracks()), durationMs: 4000 });
-      setPreviaUrl(url);
-      setMessage("Esta é a sua voz como os outros ouvem, já com o corte aplicado.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Não foi possível gravar a prévia.");
-    } finally {
-      setGravando(false);
-    }
-  };
 
   const stopPreview = () => {
     previewStreamRef.current?.getTracks().forEach(track => track.stop());
@@ -75,19 +47,22 @@ export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gate
       if (previewRef.current) previewRef.current.srcObject = stream;
       setStatus("ready");
       setMessage("Dispositivos prontos. Seu microfone e sua câmera estão disponíveis.");
-      // O nivel vem do proprio portao, que mede um clone do microfone. Medir o
-      // track cortado fazia a barra despencar a zero abaixo do corte, e assim
-      // era impossivel enxergar o quanto faltava para ajustar.
-      const soltarPortao = createNoiseGate({
-        stream,
-        getThreshold: () => sensitivityToThreshold(gateSensitivityRef.current),
-        isEnabled: () => true,
-        onLevel: nivel => {
-          setAudioLevel(nivel);
-          setPeak(anterior => Math.max(anterior, nivel));
-        },
-      });
-      stream.getTracks().forEach(track => { track.onended = () => soltarPortao?.(); });
+      const AudioContextClass = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass || !stream.getAudioTracks().length) return;
+      const context = new AudioContextClass();
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      context.createMediaStreamSource(stream).connect(analyser);
+      const samples = new Uint8Array(analyser.fftSize);
+      let frame = 0;
+      const updateLevel = () => {
+        analyser.getByteTimeDomainData(samples);
+        const average = samples.reduce((sum, value) => sum + Math.abs(value - 128), 0) / samples.length;
+        setAudioLevel(Math.min(100, Math.round(average * 4.5)));
+        frame = requestAnimationFrame(updateLevel);
+      };
+      updateLevel();
+      stream.getTracks().forEach(track => { track.onended = () => { cancelAnimationFrame(frame); void context.close(); }; });
     } catch (error) {
       setStatus("error");
       const name = error instanceof DOMException ? error.name : "";
@@ -104,10 +79,7 @@ export function CallPreflightDialog({ open, roomName, onOpenChange, onJoin, gate
     return stopPreview;
   }, [open]);
 
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="vybe-preflight max-w-xl border-orange-300/25 bg-[#101116] p-0 text-orange-50" showCloseButton={false}><div className="p-5 sm:p-6"><DialogHeader><p className="cyber-label">Pré-checagem da chamada</p><DialogTitle className="text-xl text-orange-50">Entrar em {roomName}</DialogTitle><DialogDescription className="text-stone-400">Confirme seus dispositivos antes de entrar. Você poderá alterá-los durante a chamada.</DialogDescription></DialogHeader><div className="mt-5 grid gap-4 sm:grid-cols-[1.1fr_.9fr]"><div className="relative min-h-44 overflow-hidden rounded-2xl border border-orange-300/20 bg-black/40"><video ref={previewRef} autoPlay muted playsInline className="h-full w-full object-cover" />{status !== "ready" && <div className="absolute inset-0 grid place-items-center text-center"><div><VideoOff className="mx-auto size-7 text-orange-300" /><p className="mt-2 text-xs text-stone-400">Preview da câmera</p></div></div>}</div><div className="space-y-3"><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Mic className="size-3.5 text-orange-300" />Microfone</span><select value={audioInputId} onChange={event => setAudioInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{audioInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Video className="size-3.5 text-orange-300" />Câmera</span><select value={videoInputId} onChange={event => setVideoInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{videoInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><div className="rounded-xl border border-orange-300/15 bg-orange-400/5 p-3"><span className="flex items-center gap-1.5 text-xs font-medium text-orange-100"><AudioLines className="size-3.5 text-orange-300" />Nível do microfone</span><MicSensitivityMeter className="mt-2" level={audioLevel} sensitivity={gateSensitivity} onSensitivityChange={onGateSensitivityChange} live={status === "ready"} />
-<p className="mt-1 text-[10px] leading-4 text-stone-500">{VERDICT_TEXT[veredito]}</p>
-<button type="button" onClick={ouvirMinhaVoz} disabled={gravando} className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-orange-300/25 py-2 text-[11px] font-semibold text-orange-100 hover:bg-orange-400/10 disabled:opacity-60">
-  {gravando ? <><Loader2 className="size-3.5 animate-spin" />Gravando…</> : <><Play className="size-3.5" />Ouvir minha voz</>}
-</button>
-{previaUrl && <audio src={previaUrl} controls autoPlay className="mt-2 w-full" />}</div></div></div><div className={`mt-4 flex items-start gap-2 rounded-xl border p-3 text-xs ${status === "error" ? "border-rose-400/30 bg-rose-500/10 text-rose-100" : status === "ready" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100" : "border-orange-300/15 bg-black/20 text-stone-400"}`}>{status === "ready" ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AudioLines className="mt-0.5 size-4 shrink-0" />}<span>{message}</span></div><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => onOpenChange(false)} className="border-orange-300/25 text-orange-100">Cancelar</Button><Button variant="outline" onClick={checkDevices} className="border-orange-300/30 text-orange-100">Testar dispositivos</Button><Button onClick={() => { stopPreview(); onOpenChange(false); onJoin({ audioInputId: audioInputId || undefined, videoInputId: videoInputId || undefined }); }} className="bg-orange-500 text-black hover:bg-orange-400">Entrar na sala</Button></div></div></DialogContent></Dialog>;
+  const selectedAudioLabel = audioInputs.find(input => input.deviceId === audioInputId)?.label ?? "";
+  const loopbackWarning = getLoopbackInputWarning(selectedAudioLabel);
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="vybe-preflight max-w-xl border-orange-300/25 bg-[#101116] p-0 text-orange-50" showCloseButton={false}><div className="p-5 sm:p-6"><DialogHeader><p className="cyber-label">Pré-checagem da chamada</p><DialogTitle className="text-xl text-orange-50">Entrar em {roomName}</DialogTitle><DialogDescription className="text-stone-400">Confirme seus dispositivos antes de entrar. Você poderá alterá-los durante a chamada.</DialogDescription></DialogHeader><div className="mt-5 grid gap-4 sm:grid-cols-[1.1fr_.9fr]"><div className="relative min-h-44 overflow-hidden rounded-2xl border border-orange-300/20 bg-black/40"><video ref={previewRef} autoPlay muted playsInline className="h-full w-full object-cover" />{status !== "ready" && <div className="absolute inset-0 grid place-items-center text-center"><div><VideoOff className="mx-auto size-7 text-orange-300" /><p className="mt-2 text-xs text-stone-400">Preview da câmera</p></div></div>}</div><div className="space-y-3"><label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Mic className="size-3.5 text-orange-300" />Microfone</span><select value={audioInputId} onChange={event => setAudioInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{audioInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label>{loopbackWarning && <p className="rounded-xl border border-orange-300/25 bg-orange-400/10 p-2 text-[11px] leading-4 text-orange-100">{loopbackWarning}</p>}<label className="block text-xs text-stone-400"><span className="mb-1.5 flex items-center gap-1.5"><Video className="size-3.5 text-orange-300" />Câmera</span><select value={videoInputId} onChange={event => setVideoInputId(event.target.value)} className="h-10 w-full rounded-xl border border-orange-300/20 bg-black/40 px-3 text-sm text-orange-50 outline-none"><option value="">Padrão do sistema</option>{videoInputs.map(input => <option key={input.deviceId} value={input.deviceId}>{input.label}</option>)}</select></label><div className="rounded-xl border border-orange-300/15 bg-orange-400/5 p-3"><span className="flex items-center gap-1.5 text-xs font-medium text-orange-100"><AudioLines className="size-3.5 text-orange-300" />Nível do microfone</span><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/50"><div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-orange-300 to-orange-500 transition-[width] duration-100" style={{ width: `${Math.max(4, audioLevel)}%` }} /></div></div></div></div><div className={`mt-4 flex items-start gap-2 rounded-xl border p-3 text-xs ${status === "error" ? "border-rose-400/30 bg-rose-500/10 text-rose-100" : status === "ready" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100" : "border-orange-300/15 bg-black/20 text-stone-400"}`}>{status === "ready" ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <AudioLines className="mt-0.5 size-4 shrink-0" />}<span>{message}</span></div><div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => onOpenChange(false)} className="border-orange-300/25 text-orange-100">Cancelar</Button><Button variant="outline" onClick={checkDevices} className="border-orange-300/30 text-orange-100">Testar dispositivos</Button><Button onClick={() => { stopPreview(); onOpenChange(false); onJoin({ audioInputId: audioInputId || undefined, videoInputId: videoInputId || undefined }); }} className="bg-orange-500 text-black hover:bg-orange-400">Entrar na sala</Button></div></div></DialogContent></Dialog>;
 }
