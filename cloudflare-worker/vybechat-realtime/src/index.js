@@ -54,6 +54,22 @@ function directIndexKey(userId) {
 }
 
 const DECISIONS_KEY = "team:decisions";
+const MUSIC_STATE_PREFIX = "music:state:";
+
+function emptyMusicState() {
+  return { queue: [], queueIndex: -1, playlistIndex: 0, positionSeconds: 0, playing: false, djUserId: null };
+}
+
+function musicStateKey(channelId) {
+  return `${MUSIC_STATE_PREFIX}${channelId}`;
+}
+
+function sanitizeMusicItem(payload, state) {
+  const kind = payload?.kind === "playlist" ? "playlist" : payload?.kind === "video" ? "video" : null;
+  const value = kind === "playlist" ? String(payload?.playlistId ?? "").trim() : String(payload?.videoId ?? "").trim();
+  if (!kind || !/^[A-Za-z0-9_-]{6,120}$/.test(value)) return null;
+  return { kind, ...(kind === "playlist" ? { playlistId: value } : { videoId: value }), addedBy: state, addedAt: new Date().toISOString() };
+}
 
 // O /roster e chamado pelo navegador de outra origem (Pages -> workers.dev),
 // entao precisa de CORS. Sem isso a tela de entrada nem consegue perguntar.
@@ -288,6 +304,18 @@ export class VybeChatRoom {
     await this.ctx.storage.put(DECISIONS_KEY, decisions.slice(0, 100));
   }
 
+  async getMusicState(channelId) {
+    return (await this.ctx.storage.get(musicStateKey(channelId))) ?? emptyMusicState();
+  }
+
+  async putMusicState(channelId, musicState) {
+    await this.ctx.storage.put(musicStateKey(channelId), musicState);
+  }
+
+  broadcastMusicState(channelId, musicState) {
+    this.broadcast("music:state", { channelId, state: musicState });
+  }
+
   async handleEvent(socket, type, payload) {
     const state = this.getState(socket);
     if (!state) return;
@@ -451,6 +479,61 @@ export class VybeChatRoom {
       const updated = decisions.map(decision => decision.id === payload.id ? { ...decision, status: payload.status } : decision);
       await this.putDecisions(updated);
       this.broadcast("decision:list", { decisions: updated });
+      return;
+    }
+
+    if (type === "music:get" && this.validChannelId(payload.channelId)) {
+      socket.send(json("music:state", { channelId: payload.channelId, state: await this.getMusicState(payload.channelId) }));
+      return;
+    }
+
+    if (type === "music:claim-dj" && this.validChannelId(payload.channelId) && state.userId) {
+      const musicState = await this.getMusicState(payload.channelId);
+      const currentDjOnline = musicState.djUserId && this.findUserSocket(musicState.djUserId);
+      if (musicState.djUserId && musicState.djUserId !== state.userId && currentDjOnline && !canModerate(state.role)) {
+        return socket.send(json("realtime:error", { message: "Outro participante já controla a música da sala." }));
+      }
+      const next = { ...musicState, djUserId: state.userId };
+      await this.putMusicState(payload.channelId, next);
+      this.broadcastMusicState(payload.channelId, next);
+      return;
+    }
+
+    if (type === "music:enqueue" && this.validChannelId(payload.channelId) && state.userId) {
+      const item = sanitizeMusicItem(payload, { id: state.userId, name: state.name });
+      if (!item) return socket.send(json("realtime:error", { message: "Link de música inválido." }));
+      const musicState = await this.getMusicState(payload.channelId);
+      const queue = [...musicState.queue, { ...item, id: crypto.randomUUID() }].slice(-80);
+      const next = {
+        ...musicState,
+        queue,
+        queueIndex: musicState.queueIndex < 0 ? 0 : musicState.queueIndex,
+        playing: musicState.queueIndex < 0 ? true : musicState.playing,
+        djUserId: musicState.djUserId ?? state.userId,
+      };
+      await this.putMusicState(payload.channelId, next);
+      this.broadcastMusicState(payload.channelId, next);
+      return;
+    }
+
+    if (type === "music:control" && this.validChannelId(payload.channelId) && state.userId) {
+      const musicState = await this.getMusicState(payload.channelId);
+      const canControlMusic = musicState.djUserId === state.userId || canModerate(state.role);
+      if (!canControlMusic) return socket.send(json("realtime:error", { message: "Assuma o controle da música para alterar a fila." }));
+      const action = String(payload.action ?? "");
+      const positionSeconds = Math.max(0, Math.min(60 * 60 * 12, Number(payload.positionSeconds) || 0));
+      const playlistIndex = Math.max(0, Math.min(9999, Number(payload.playlistIndex) || 0));
+      let next = { ...musicState };
+      if (action === "play") next = { ...next, playing: true, positionSeconds };
+      if (action === "pause") next = { ...next, playing: false, positionSeconds };
+      if (action === "sync") next = { ...next, positionSeconds, playlistIndex, playing: Boolean(payload.playing) };
+      if (action === "next" && next.queue.length) next = { ...next, queueIndex: (next.queueIndex + 1) % next.queue.length, playlistIndex: 0, positionSeconds: 0, playing: true };
+      if (action === "previous" && next.queue.length) next = { ...next, queueIndex: (next.queueIndex - 1 + next.queue.length) % next.queue.length, playlistIndex: 0, positionSeconds: 0, playing: true };
+      if (action === "select" && Number.isInteger(payload.queueIndex) && payload.queueIndex >= 0 && payload.queueIndex < next.queue.length) next = { ...next, queueIndex: payload.queueIndex, playlistIndex, positionSeconds, playing: Boolean(payload.playing) };
+      if (action === "clear") next = { ...emptyMusicState(), djUserId: state.userId };
+      if (!["play", "pause", "sync", "next", "previous", "select", "clear"].includes(action)) return;
+      await this.putMusicState(payload.channelId, next);
+      this.broadcastMusicState(payload.channelId, next);
       return;
     }
 

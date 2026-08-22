@@ -269,4 +269,30 @@ describe("VybeChatRoom collaboration integration", () => {
     expect(updated.status).toBe("done");
     expect(packets(member).some(packet => packet.type === "decision:list" && packet.payload.decisions.length === 1)).toBe(true);
   });
+
+  it("persiste música da sala, sincroniza a fila e protege os controles do DJ", async () => {
+    const { room, storage, admin, member } = setup();
+    await room.handleEvent(member, "music:enqueue", { channelId: 5, kind: "video", videoId: "dQw4w9WgXcQ" });
+    const created = await storage.get("music:state:5") as { queue: Array<{ videoId?: string }>; queueIndex: number; djUserId?: string; playing: boolean };
+    expect(created.queue[0]?.videoId).toBe("dQw4w9WgXcQ");
+    expect(created.queueIndex).toBe(0);
+    expect(created.djUserId).toBe("member@vybe.com");
+    expect(created.playing).toBe(true);
+
+    await room.handleEvent(admin, "music:claim-dj", { channelId: 5 });
+    await room.handleEvent(admin, "music:control", { channelId: 5, action: "pause", positionSeconds: 31 });
+    const paused = await storage.get("music:state:5") as { playing: boolean; positionSeconds: number };
+    expect(paused).toMatchObject({ playing: false, positionSeconds: 31 });
+
+    await room.handleEvent(member, "music:control", { channelId: 5, action: "play", positionSeconds: 32 });
+    expect(packets(member).at(-1)).toMatchObject({ type: "realtime:error" });
+  });
+
+  it("permite que uma playlist seja enfileirada e devolve seu estado ao abrir o painel", async () => {
+    const { room, member } = setup();
+    await room.handleEvent(member, "music:enqueue", { channelId: 5, kind: "playlist", playlistId: "PLVYBE123" });
+    await room.handleEvent(member, "music:get", { channelId: 5 });
+    const state = packets(member).filter(packet => packet.type === "music:state").at(-1);
+    expect(state).toMatchObject({ payload: { channelId: 5, state: { queue: [{ kind: "playlist", playlistId: "PLVYBE123" }] } } });
+  });
 });

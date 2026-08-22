@@ -7,6 +7,7 @@ import { DirectMessagesDrawer, type DirectMessage, type DirectThread } from "@/c
 import { VybeCommandPalette } from "@/components/VybeCommandPalette";
 import { NotificationControl } from "@/components/NotificationControl";
 import { DecisionsDrawer, type TeamDecision } from "@/components/DecisionsDrawer";
+import { RoomMusicPanel } from "@/components/RoomMusicPanel";
 import { MediaTile } from "@/components/MediaTile";
 import { VoiceContextDock } from "@/components/VoiceContextDock";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,9 +34,10 @@ import { toProfileId, type TeamMember } from "@/lib/team-roster";
 import { bumpUnread, clearUnread, mentionAliases, mentionsSomeone, totalUnread, type UnreadMap } from "@/lib/unread";
 import { summarizePeerAudioStats, type PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 import { getRealtimeSocket } from "@/lib/realtime";
+import type { MusicControlAction, RoomMusicState } from "@/lib/room-music";
 import { useVybeNotifications } from "@/lib/use-vybe-notifications";
 import type { VoiceRoom } from "@/lib/voice-room-state";
-import { Bell, Hash, Pencil, Trash2, LogOut, Menu, Mic, MicOff, MonitorUp, Phone, Pin, Search, SendHorizontal, SmilePlus, UserPlus, Video, VideoOff, Volume2, X } from "lucide-react";
+import { Bell, Hash, Music2, Pencil, Trash2, LogOut, Menu, Mic, MicOff, MonitorUp, Phone, Pin, Search, SendHorizontal, SmilePlus, UserPlus, Video, VideoOff, Volume2, X } from "lucide-react";
 import { Fragment, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Profile = LocalProfile & { photo?: string };
@@ -150,6 +152,8 @@ export default function CloudflareHome() {
   const [activeDirectThreadId, setActiveDirectThreadId] = useState<string | null>(null);
   const [handRaised, setHandRaised] = useState(false);
   const [decisions, setDecisions] = useState<TeamDecision[]>([]);
+  const [musicOpen, setMusicOpen] = useState(false);
+  const [musicState, setMusicState] = useState<RoomMusicState | null>(null);
   const socketRef = useRef(getRealtimeSocket());
   const localStreamRef = useRef<MediaStream | null>(null);
   const activeCallRef = useRef<number | null>(null);
@@ -211,6 +215,18 @@ export default function CloudflareHome() {
   const isContextPreview = window.location.pathname === "/cloudflare-preview" && new URLSearchParams(window.location.search).get("demo") === "1" && new URLSearchParams(window.location.search).get("call") === "1";
   const activeRoomMembers = activeCallChannelId ? (isContextPreview ? [{ socketId: "preview-vybe", userId: "preview-vybe", name: "Vybe Preview", status: "online" as const, isMuted: false, isSpeaking: false }, { socketId: "preview-paulo", userId: "preview-paulo", name: "Paulo", status: "online" as const, isMuted: false, isSpeaking: true }] : voiceRooms[activeCallChannelId] ?? []) : [];
   const channelMessages = messages[selectedChannelId] ?? [];
+  const musicContextRole = profile ? presence.find(member => member.userId === profile.id)?.role ?? "member" : "member";
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("vybechat:music-context", {
+      detail: activeCallChannelId && profile ? {
+        channelId: activeCallChannelId,
+        userId: profile.id,
+        roomName: findExternalChannel(activeCallChannelId)?.name ?? "Sala de voz",
+        canModerate: musicContextRole === "admin" || musicContextRole === "moderator",
+      } : null,
+    }));
+  }, [activeCallChannelId, musicContextRole, profile]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -354,6 +370,7 @@ export default function CloudflareHome() {
       socket.emit("direct:list", {});
       socket.emit("decision:list", {});
       socket.emit("workspace:list", {});
+      if (activeCallRef.current) socket.emit("music:get", { channelId: activeCallRef.current });
     };
     socket.on("connect", announce);
     socket.on("presence:update", (users: Presence[]) => setPresence(users));
@@ -392,6 +409,9 @@ export default function CloudflareHome() {
     });
     socket.on("direct:read", ({ thread }: { thread: DirectThread }) => setDirectThreads(current => current.map(item => item.id === thread.id ? thread : item)));
     socket.on("decision:list", ({ decisions: nextDecisions }: { decisions: TeamDecision[] }) => setDecisions(nextDecisions));
+    socket.on("music:state", ({ channelId, state: nextMusicState }: { channelId: number; state: RoomMusicState }) => {
+      if (channelId === activeCallRef.current) setMusicState(nextMusicState);
+    });
     socket.on("typing", ({ channelId, name: typingName, active }: { channelId: number; name: string; active: boolean }) => {
       if (channelId !== selectedChannelIdRef.current || typingName === profile.name) return;
       setTypingNames(current => active ? Array.from(new Set([...current, typingName])) : current.filter(item => item !== typingName));
@@ -523,7 +543,7 @@ export default function CloudflareHome() {
     socket.connect();
     if (socket.connected) announce();
     return () => {
-      ["connect", "session:ready", "presence:update", "voice:rooms", "message:history", "message:new", "message:update", "message:removed", "message:pins", "message:search-results", "channel:permissions", "direct:list", "direct:history", "direct:new", "direct:read", "decision:list", "workspace:list", "typing", "call:invite", "call:force-mute", "call:peers", "call:peer-joined", "call:offer", "call:answer", "call:ice", "call:peer-left", "call:screen-share", "realtime:error"].forEach(event => socket.off(event));
+      ["connect", "session:ready", "presence:update", "voice:rooms", "message:history", "message:new", "message:update", "message:removed", "message:pins", "message:search-results", "channel:permissions", "direct:list", "direct:history", "direct:new", "direct:read", "decision:list", "music:state", "workspace:list", "typing", "call:invite", "call:force-mute", "call:peers", "call:peer-joined", "call:offer", "call:answer", "call:ice", "call:peer-left", "call:screen-share", "realtime:error"].forEach(event => socket.off(event));
     };
   }, [activeDirectThreadId, notify, profile, status, statusMessage]);
 
@@ -706,6 +726,18 @@ export default function CloudflareHome() {
   };
   const createDecision = (decision: { title: string; ownerName: string; dueDate: string }) => socketRef.current.emit("decision:create", decision);
   const updateDecision = (id: string, status: "open" | "done") => socketRef.current.emit("decision:update", { id, status });
+  const requestMusicState = () => {
+    if (activeCallRef.current) socketRef.current.emit("music:get", { channelId: activeCallRef.current });
+  };
+  const enqueueMusic = (source: { kind: "video" | "playlist"; videoId?: string; playlistId?: string }) => {
+    if (activeCallRef.current) socketRef.current.emit("music:enqueue", { channelId: activeCallRef.current, ...source });
+  };
+  const claimMusicDj = () => {
+    if (activeCallRef.current) socketRef.current.emit("music:claim-dj", { channelId: activeCallRef.current });
+  };
+  const controlMusic = (action: MusicControlAction, payload: Partial<Pick<RoomMusicState, "queueIndex" | "playlistIndex" | "positionSeconds" | "playing">> = {}) => {
+    if (activeCallRef.current) socketRef.current.emit("music:control", { channelId: activeCallRef.current, action, ...payload });
+  };
   const toggleReadOnly = () => {
     const current = channelPermissions[selectedChannelId] ?? { readOnly: false, invitePolicy: "member" as const };
     socketRef.current.emit("channel:permissions:update", { channelId: selectedChannelId, readOnly: !current.readOnly, invitePolicy: current.invitePolicy });
@@ -740,6 +772,8 @@ export default function CloudflareHome() {
     setCallPeers({});
     setCallStageOpen(false);
     setHandRaised(false);
+    setMusicOpen(false);
+    setMusicState(null);
   };
 
   const joinVoice = async (channelId: number, selection: CallDeviceSelection = {}) => {
@@ -765,6 +799,7 @@ export default function CloudflareHome() {
       setCallStageOpen(false);
       setMobileSidebarOpen(false);
       socketRef.current.emit("call:join", { channelId });
+      socketRef.current.emit("music:get", { channelId });
     } catch (error) {
       setNotice(getCallMediaErrorMessage(error));
     }

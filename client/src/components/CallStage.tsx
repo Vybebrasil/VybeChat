@@ -1,10 +1,11 @@
-import { Expand, Grid2X2, Hand, Mic, MicOff, Minimize2, MonitorUp, Phone, Pin, Shrink, Video, VideoOff, Volume2 } from "lucide-react";
+import { Expand, Grid2X2, Hand, Mic, MicOff, Minimize2, MonitorUp, Music2, Phone, Pin, Shrink, Video, VideoOff, Volume2 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getStageTile, getThumbnailTiles, type CallStageTile as CallStageTileState } from "@/lib/call-stage";
 import { resolveStageFocus } from "@/lib/screen-share";
 import { getNextCallStageView, togglePinnedParticipant, type CallStageView } from "@/lib/call-stage-ui";
 import { MediaTile } from "@/components/MediaTile";
 import { MicSensitivityMeter } from "@/components/MicSensitivityMeter";
+import { CallStageMusic } from "@/components/CallStageMusic";
 import { isFullscreenActive, toggleFullscreen as toggleDocumentFullscreen, type FullscreenDocumentLike, type FullscreenElementLike } from "@/lib/fullscreen";
 import type { PeerAudioDiagnostics } from "@/lib/peer-audio-diagnostics";
 
@@ -39,6 +40,7 @@ type CallStageProps = {
   onToggleCamera: () => void;
   onShareScreen: () => void;
   onToggleHandRaise?: () => void;
+  onOpenMusic?: () => void;
   onLeave: () => void;
   onMinimize: () => void;
 };
@@ -60,6 +62,7 @@ export function CallStage({
   onToggleCamera,
   onShareScreen,
   onToggleHandRaise = () => {},
+  onOpenMusic,
   onLeave,
   onMinimize,
 }: CallStageProps) {
@@ -115,7 +118,7 @@ export function CallStage({
         <span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex ${microphoneOn ? "bg-emerald-400/10 text-emerald-200" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${microphoneOn ? "bg-emerald-400" : "bg-rose-400"}`} />{microphoneOn ? "Microfone ativo" : "Microfone pausado"}</span><span className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold lg:flex ${callQuality === "Conexão estável" ? "bg-emerald-400/10 text-emerald-200" : callQuality === "Conectando mídia" ? "bg-orange-400/10 text-orange-100" : "bg-rose-400/10 text-rose-200"}`}><span className={`size-1.5 rounded-full ${callQuality === "Conexão estável" ? "bg-emerald-400" : callQuality === "Conectando mídia" ? "bg-orange-300" : "bg-rose-400"}`} />{callQuality}</span>
         <button onClick={() => setRosterOpen(current => !current)} className={`grid size-9 place-items-center rounded-lg border text-xs font-bold transition-colors ${rosterOpen ? "border-orange-300/50 bg-orange-400/15 text-orange-100" : "border-white/10 bg-white/5 text-stone-200 hover:bg-white/10"}`} aria-label={rosterOpen ? "Fechar participantes" : "Abrir participantes"}>{participants.length}</button>
         <button onClick={() => setView(getNextCallStageView)} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label={view === "stage" ? "Abrir grade de participantes" : "Abrir palco principal"}>{view === "stage" ? <Grid2X2 className="size-4" /> : <MonitorUp className="size-4" />}</button>
-        
+        {onOpenMusic && <button onClick={onOpenMusic} className="grid size-9 place-items-center rounded-lg border border-orange-300/25 bg-orange-400/10 text-orange-100 hover:bg-orange-400/20" aria-label="Abrir música da sala"><Music2 className="size-4" /></button>}
         <button onClick={onMinimize} className="grid size-9 place-items-center rounded-lg border border-white/10 bg-white/5 text-stone-200 hover:bg-white/10" aria-label="Minimizar chamada"><Minimize2 className="size-4" /></button>
       </header>
 
@@ -136,6 +139,7 @@ export function CallStage({
         <button onClick={onToggleMic} className={`grid size-11 place-items-center rounded-xl border transition-colors ${microphoneOn ? "border-white/10 bg-white/5 text-white hover:bg-white/10" : "border-rose-500/30 bg-rose-500/20 text-rose-100"}`} aria-label={microphoneOn ? "Desligar microfone" : "Ligar microfone"}>{microphoneOn ? <Mic className="size-5" /> : <MicOff className="size-5" />}</button>
         <button onClick={onToggleCamera} className={`grid size-11 place-items-center rounded-xl border transition-colors ${cameraOn ? "border-white/10 bg-white/5 text-white hover:bg-white/10" : "border-rose-500/30 bg-rose-500/20 text-rose-100"}`} aria-label={cameraOn ? "Desligar câmera" : "Ligar câmera"}>{cameraOn ? <Video className="size-5" /> : <VideoOff className="size-5" />}</button>
         <button onClick={onShareScreen} className={`flex h-11 items-center gap-2 rounded-xl border px-3 text-[12px] font-semibold transition-colors ${sharingScreen ? "border-orange-300 bg-orange-500 text-black" : "border-white/10 bg-white/5 text-white hover:bg-white/10"}`}><MonitorUp className="size-5" /><span className="hidden sm:inline">{sharingScreen ? "Parar transmissão" : "Compartilhar tela"}</span></button>
+        <CallStageMusic />
         <button onClick={onToggleHandRaise} className={`grid size-11 place-items-center rounded-xl border transition-colors ${handRaised ? "border-orange-300 bg-orange-400 text-black" : "border-white/10 bg-white/5 text-white hover:bg-white/10"}`} aria-label={handRaised ? "Baixar a mão" : "Levantar a mão"}><Hand className="size-5" /></button>
         <button onClick={onLeave} className="grid size-11 place-items-center rounded-xl bg-rose-500 text-white hover:bg-rose-400" aria-label="Sair da chamada"><Phone className="size-5 rotate-[135deg]" /></button>
       </footer>
