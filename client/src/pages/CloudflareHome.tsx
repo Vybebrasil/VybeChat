@@ -2437,7 +2437,7 @@ export default function CloudflareHome() {
   );
 
   return (
-    <main className="vybe-app flex min-h-screen text-foreground">
+    <main className="vybe-app vybe-cyber-grid flex h-[100dvh] w-full text-slate-300 overflow-hidden">
       <CallPreflightDialog
         gateSensitivity={gateSensitivity}
         onGateSensitivityChange={setGateSensitivity}
@@ -2594,7 +2594,7 @@ export default function CloudflareHome() {
                           <div className="min-w-0 flex-1">
                             <p className="flex flex-wrap items-baseline gap-x-2 text-xs font-semibold text-stone-100">
                               {message.authorName}
-                              <span className="text-[10px] font-normal text-stone-600">
+                              <span className="text-[10px] font-mono text-stone-500/80 tracking-wider">
                                 {formatMessageTime(message.createdAt)}
                               </span>
                               {message.editedAt && (

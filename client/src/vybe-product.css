@@ -1,16 +1,16 @@
 :root {
-  --vybe-bg: #080809;
-  --vybe-sidebar: #111113;
-  --vybe-surface: #151518;
-  --vybe-surface-raised: #1b1b1f;
-  --vybe-hover: rgba(255, 255, 255, 0.055);
-  --vybe-line: rgba(255, 255, 255, 0.085);
-  --vybe-line-strong: rgba(255, 255, 255, 0.14);
+  --vybe-bg: #000000;
+  --vybe-sidebar: rgba(0, 0, 0, 0.3);
+  --vybe-surface: rgba(15, 15, 18, 0.4);
+  --vybe-surface-raised: rgba(25, 25, 30, 0.6);
+  --vybe-hover: rgba(255, 255, 255, 0.05);
+  --vybe-line: rgba(255, 255, 255, 0.05);
+  --vybe-line-strong: rgba(255, 255, 255, 0.1);
   --vybe-text: #f5f5f7;
-  --vybe-muted: #a0a0a8;
-  --vybe-subtle: #73737c;
-  --vybe-orange: #ff850a;
-  --vybe-orange-soft: rgba(255, 133, 10, 0.13);
+  --vybe-muted: #95959e;
+  --vybe-subtle: #65656d;
+  --vybe-orange: #ff7e12;
+  --vybe-orange-soft: rgba(255, 126, 18, 0.12);
   --vybe-danger: #f43f5e;
 }
 
@@ -28,27 +28,32 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+.vybe-cyber-grid {
+  background-size: 24px 24px;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+}
+
 * {
-  scrollbar-color: #3d3d43 transparent;
+  scrollbar-color: rgba(255, 126, 18, 0.4) transparent;
   scrollbar-width: thin;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
   border-radius: 999px;
-  background: #3d3d43;
-  background-clip: padding-box;
+  background: rgba(255, 126, 18, 0.3);
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #55555e;
-  background-clip: padding-box;
+  background: rgba(255, 126, 18, 0.8);
+  box-shadow: 0 0 10px rgba(255, 126, 18, 0.5);
 }
 
 .vybe-app {
@@ -72,12 +77,11 @@ body {
   box-shadow: none !important;
 }
 .vybe-sidebar {
-  width: 272px !important;
-  border: 0 !important;
-  border-right: 1px solid var(--vybe-line) !important;
-  border-radius: 0 !important;
   background: var(--vybe-sidebar) !important;
-  box-shadow: none !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  width: 290px;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
 }
 .vybe-sidebar-brand {
   min-height: 108px;
@@ -89,12 +93,14 @@ body {
 }
 .cyber-label,
 .command-nav-group > p {
-  color: var(--vybe-subtle) !important;
-  font-family: inherit !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.045em !important;
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--vybe-subtle);
+  margin-bottom: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 .command-nav-group {
   margin-bottom: 18px;
@@ -122,11 +128,15 @@ body {
   color: #fff;
 }
 .command-nav-channel > button.is-active {
-  background: var(--vybe-orange-soft);
+  background: linear-gradient(90deg, rgba(255, 126, 18, 0.15) 0%, transparent 100%);
   color: #fff;
+  border-left: 2px solid var(--vybe-orange);
+  padding-left: 6px;
+  box-shadow: inset 20px 0 20px -20px rgba(255, 126, 18, 0.4);
 }
 .command-nav-channel > button.is-active svg {
   color: var(--vybe-orange);
+  filter: drop-shadow(0 0 6px rgba(255, 126, 18, 0.6));
 }
 .command-nav-channel > button span {
   min-width: 0;
@@ -192,9 +202,10 @@ body {
 
 .vybe-channel-header {
   min-height: 64px;
-  border-color: var(--vybe-line) !important;
-  background: rgba(11, 11, 13, 0.88) !important;
-  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
 }
 .vybe-channel-header h1 {
   color: var(--vybe-text) !important;
@@ -291,23 +302,27 @@ body {
 }
 .vybe-composer {
   max-width: 1120px !important;
-  padding: 10px 24px 18px !important;
-  background: linear-gradient(to top, #0b0b0d 72%, transparent) !important;
+  padding: 10px 24px 24px !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 60%, transparent) !important;
 }
 .vybe-composer textarea {
   min-height: 50px !important;
-  border: 1px solid var(--vybe-line) !important;
-  border-radius: 14px !important;
-  background: var(--vybe-surface) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 18px !important;
+  background: rgba(15, 15, 18, 0.5) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--vybe-text) !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4) !important;
+  transition: all 0.2s ease;
 }
 .vybe-composer textarea::placeholder {
   color: #777780 !important;
 }
 .vybe-composer textarea:focus {
-  border-color: rgba(255, 133, 10, 0.48) !important;
-  box-shadow: 0 0 0 3px rgba(255, 133, 10, 0.09) !important;
+  border-color: var(--vybe-orange) !important;
+  background: rgba(15, 15, 18, 0.8) !important;
+  box-shadow: 0 0 15px rgba(255, 126, 18, 0.25), inset 0 2px 4px rgba(0,0,0,0.4) !important;
 }
 .vybe-composer button[type="submit"] {
   width: 50px;
