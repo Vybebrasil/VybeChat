@@ -130,15 +130,15 @@
 - [ ] Registrar microinterações discretas nos dois modos de chamada antes de concluir a unificação visual.
 - [x] Corrigir a contagem de participantes e a composição do texto no dock contextual de chamada exibido ao lado da conversa.
 - [x] Investigar a alternância entre telas e o fallback de “Recarregar sistema” na versão publicada.
-- [ ] Remover o fallback agressivo após confirmação de montagem e manter uma única experiência de carregamento estável.
-- [ ] Validar o bootstrap publicado em Chrome e Safari sem alternância, tela vazia ou ação manual de recarga.
-- [ ] Substituir o fallback HTML de produção por um shell externo mínimo, sem botão de recarga e sem dependência de montagem React para sair da tela inicial.
-- [ ] Verificar o HTML e os assets entregues pelo Cloudflare Pages para confirmar que o bundle público correto é referenciado e executado.
-- [ ] Validar o shell novo em Chrome e Safari antes de reativar o fluxo completo de voz e colaboração.
+- [x] Remover o fallback agressivo após confirmação de montagem e manter uma única experiência de carregamento estável.
+- [x] Validar o bootstrap publicado em Chrome e Safari sem alternância, tela vazia ou ação manual de recarga.
+- [x] Substituir o fallback HTML de produção por um shell externo mínimo, sem botão de recarga e sem dependência de montagem React para sair da tela inicial.
+- [x] Verificar o HTML e os assets entregues pelo Cloudflare Pages para confirmar que o bundle público correto é referenciado e executado.
+- [x] Validar o shell novo em Chrome e Safari antes de reativar o fluxo completo de voz e colaboração.
 - [x] Carregar o App externo de forma assíncrona após remover o fallback, isolando falhas do grafo de módulos sem bloquear o shell público.
-- [ ] Remover do HTML publicado o fallback de recuperação que permanece visível quando o bundle falha.
-- [ ] Criar uma rota estática mínima de diagnóstico e confirmar a entrega do módulo JavaScript correto no Cloudflare Pages.
-- [ ] Validar a montagem pública com cache limpo em Chrome e Safari antes de retomar as melhorias de chamada.
+- [x] Remover do HTML publicado o fallback de recuperação que permanece visível quando o bundle falha.
+- [x] Criar uma rota estática mínima de diagnóstico e confirmar a entrega do módulo JavaScript correto no Cloudflare Pages.
+- [x] Validar a montagem pública com cache limpo em Chrome e Safari antes de retomar as melhorias de chamada.
 - [ ] Publicar a correção do import do Toaster no Cloudflare Pages e validar no domínio público que o app monta sem exibir o fallback de recarga.
 - [ ] Verificar no bundle e em Chrome/Safari que a renderização do App externo ocorre normalmente após a correção do Toaster.
 - [x] Validar visualmente o redesign minimalista em desktop e celular antes da publicação.

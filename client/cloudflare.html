@@ -11,22 +11,22 @@
     <title>VybeChat — Central de comunicação</title>
     <style>
       html, body { min-height: 100%; margin: 0; background: #07080b; color: #ffd39d; }
-      #safari-fallback { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 24px; box-sizing: border-box; font-family: system-ui, sans-serif; background: radial-gradient(ellipse at 50% -25%, rgba(255, 123, 10, .2), transparent 42rem), #07080b; transition: opacity .22s ease, visibility .22s ease; }
-      #safari-fallback.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-      #safari-fallback section { width: min(440px, 100%); border: 1px solid rgba(255, 156, 41, .32); background: rgba(11, 12, 16, .94); padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
-      #safari-fallback strong { display: block; color: #ff9b36; font: 700 24px/1.2 system-ui, sans-serif; letter-spacing: .08em; }
-      #safari-fallback p { color: #b7a58f; font-size: 14px; line-height: 1.6; }
-      #bootstrap-details { display: none; color: #ffbc76; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
-      #safari-fallback a { display: inline-block; color: #ff9b36; font-size: 13px; font-weight: 700; margin-top: 8px; }
+      #root:empty {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        background: radial-gradient(ellipse at 50% -25%, rgba(255, 123, 10, .2), transparent 42rem), #07080b;
+      }
+      #root:empty::after {
+        content: "VYBECHAT"; color: #ff9b36; font: 700 24px/1.2 system-ui, sans-serif; letter-spacing: .08em;
+        animation: pulse 1.5s infinite ease-in-out alternate;
+      }
+      @keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="safari-fallback"><section><strong>VYBECHAT</strong><p id="bootstrap-status">Preparando a central de comunicação da Vybe.</p><p id="bootstrap-details" aria-live="polite"></p><a href="/safari-diagnostic.html">Abrir diagnóstico de compatibilidade</a></section></div>
     <div id="root"></div>
-    <script>(function(){var fallback=document.getElementById("safari-fallback");var status=document.getElementById("bootstrap-status");var details=document.getElementById("bootstrap-details");var dismiss=function(){if(fallback)fallback.classList.add("is-hidden")};var report=function(message,detail){if(status)status.textContent=message;if(details){details.textContent=detail||"Código: VYBE-SAFARI-BOOT";details.style.display="block"}};window.__vybechatBootstrap={ready:dismiss,fail:report};window.addEventListener("vybechat:ready",dismiss);window.addEventListener("error",function(event){if(event&&event.message)report("Não foi possível iniciar o painel neste navegador.","Código: VYBE-SAFARI-JS · "+event.message)},true);window.addEventListener("unhandledrejection",function(event){var reason=event&&event.reason;report("Não foi possível iniciar o painel neste navegador.","Código: VYBE-SAFARI-PROMISE · "+(reason&&reason.message?reason.message:String(reason||"Erro não identificado")))});window.setTimeout(function(){if(fallback&&!fallback.classList.contains("is-hidden")&&status)status.textContent="Ainda preparando a interface. O diagnóstico continuará visível se houver incompatibilidade."},3200)})();</script>
     <script type="module" src="/src/cloudflare-main.tsx"></script>
     <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){})})}</script>
   </body>
