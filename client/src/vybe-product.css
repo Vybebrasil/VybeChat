@@ -1,0 +1,435 @@
+:root {
+  --vybe-bg: #080809;
+  --vybe-sidebar: #111113;
+  --vybe-surface: #151518;
+  --vybe-surface-raised: #1b1b1f;
+  --vybe-hover: rgba(255, 255, 255, 0.055);
+  --vybe-line: rgba(255, 255, 255, 0.085);
+  --vybe-line-strong: rgba(255, 255, 255, 0.14);
+  --vybe-text: #f5f5f7;
+  --vybe-muted: #a0a0a8;
+  --vybe-subtle: #73737c;
+  --vybe-orange: #ff850a;
+  --vybe-orange-soft: rgba(255, 133, 10, 0.13);
+  --vybe-danger: #f43f5e;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--vybe-bg);
+}
+body {
+  color: var(--vybe-text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+* {
+  scrollbar-color: #3d3d43 transparent;
+  scrollbar-width: thin;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #3d3d43;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #55555e;
+  background-clip: padding-box;
+}
+
+.vybe-app {
+  min-height: 100vh;
+  gap: 0 !important;
+  padding: 0 !important;
+  background:
+    radial-gradient(
+      900px 520px at 58% -32%,
+      rgba(255, 133, 10, 0.08),
+      transparent 68%
+    ),
+    var(--vybe-bg) !important;
+}
+.vybe-shell {
+  min-width: 0;
+  min-height: 100vh;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #0b0b0d !important;
+  box-shadow: none !important;
+}
+.vybe-sidebar {
+  width: 272px !important;
+  border: 0 !important;
+  border-right: 1px solid var(--vybe-line) !important;
+  border-radius: 0 !important;
+  background: var(--vybe-sidebar) !important;
+  box-shadow: none !important;
+}
+.vybe-sidebar-brand {
+  min-height: 108px;
+  border-color: var(--vybe-line) !important;
+}
+.vybe-sidebar-scroll {
+  min-height: 0;
+  padding: 14px 10px 8px;
+}
+.cyber-label,
+.command-nav-group > p {
+  color: var(--vybe-subtle) !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.045em !important;
+  text-transform: uppercase;
+}
+.command-nav-group {
+  margin-bottom: 18px;
+}
+.command-nav-group > p {
+  margin: 0 10px 7px;
+}
+.command-nav-channel > button {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 10px;
+  color: #b1b1b9;
+  text-align: left;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.command-nav-channel > button:hover {
+  background: var(--vybe-hover);
+  color: #fff;
+}
+.command-nav-channel > button.is-active {
+  background: var(--vybe-orange-soft);
+  color: #fff;
+}
+.command-nav-channel > button.is-active svg {
+  color: var(--vybe-orange);
+}
+.command-nav-channel > button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.command-nav-channel > button em {
+  margin-left: auto;
+  color: var(--vybe-orange);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+.command-voice-member {
+  display: flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 7px;
+  margin-left: 30px;
+  padding-right: 10px;
+  color: #85858e;
+  font-size: 11px;
+}
+
+.vybe-utility-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  border-top: 1px solid var(--vybe-line);
+}
+.vybe-utility-nav button {
+  display: flex;
+  min-width: 0;
+  height: 36px;
+  align-items: center;
+  gap: 7px;
+  border-radius: 9px;
+  padding: 0 9px;
+  color: #a9a9b1;
+  font-size: 11px;
+  font-weight: 600;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.vybe-utility-nav button:hover {
+  background: var(--vybe-hover);
+  color: #fff;
+}
+.vybe-utility-nav button svg {
+  width: 15px;
+  color: var(--vybe-orange);
+}
+.vybe-utility-nav button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vybe-channel-header {
+  min-height: 64px;
+  border-color: var(--vybe-line) !important;
+  background: rgba(11, 11, 13, 0.88) !important;
+  backdrop-filter: blur(20px);
+}
+.vybe-channel-header h1 {
+  color: var(--vybe-text) !important;
+}
+.vybe-channel-header .vybe-channel-actions button {
+  border-color: var(--vybe-line);
+  color: #c9c9cf;
+}
+.vybe-channel-header .vybe-channel-actions button:hover {
+  border-color: var(--vybe-line-strong);
+  background: var(--vybe-hover);
+  color: #fff;
+}
+.vybe-channel-header .vybe-primary-action {
+  border-color: rgba(255, 133, 10, 0.35) !important;
+  background: var(--vybe-orange-soft) !important;
+  color: #ffd9b0 !important;
+}
+
+.vybe-channel-content {
+  min-height: 0;
+}
+.vybe-timeline-scroll {
+  min-height: 0;
+  padding: 12px 24px 8px !important;
+}
+.vybe-channel-container {
+  width: 100%;
+  max-width: 1120px;
+}
+.vybe-channel-intro {
+  margin-bottom: 8px !important;
+  border: 0 !important;
+  padding: 14px 10px 18px !important;
+}
+.vybe-channel-intro .cyber-label {
+  display: none;
+}
+.vybe-channel-intro h2 {
+  margin-top: 0 !important;
+  color: var(--vybe-text) !important;
+  font-size: 22px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.025em !important;
+}
+.vybe-channel-intro p:last-child {
+  margin-top: 3px !important;
+  color: var(--vybe-muted) !important;
+  font-size: 13px !important;
+}
+.vybe-message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px !important;
+}
+.vybe-message {
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  padding: 8px 10px !important;
+  transition: background-color 120ms ease;
+}
+.vybe-message:hover {
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+.vybe-message-actions {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.vybe-message:hover .vybe-message-actions,
+.vybe-message:focus-within .vybe-message-actions {
+  opacity: 1;
+}
+.vybe-empty-state {
+  min-height: 230px;
+  border-color: var(--vybe-line) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 133, 10, 0.08),
+    rgba(255, 255, 255, 0.018)
+  ) !important;
+}
+.vybe-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(255, 133, 10, 0.2);
+  border-left: 3px solid var(--vybe-orange);
+  border-radius: 10px;
+  background: rgba(255, 133, 10, 0.08);
+  color: #f4d8ba;
+}
+.vybe-composer {
+  max-width: 1120px !important;
+  padding: 10px 24px 18px !important;
+  background: linear-gradient(to top, #0b0b0d 72%, transparent) !important;
+}
+.vybe-composer textarea {
+  min-height: 50px !important;
+  border: 1px solid var(--vybe-line) !important;
+  border-radius: 14px !important;
+  background: var(--vybe-surface) !important;
+  color: var(--vybe-text) !important;
+  box-shadow: none !important;
+}
+.vybe-composer textarea::placeholder {
+  color: #777780 !important;
+}
+.vybe-composer textarea:focus {
+  border-color: rgba(255, 133, 10, 0.48) !important;
+  box-shadow: 0 0 0 3px rgba(255, 133, 10, 0.09) !important;
+}
+.vybe-composer button[type="submit"] {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px !important;
+  background: var(--vybe-orange) !important;
+  color: #18110a !important;
+  box-shadow: none !important;
+}
+
+.voice-context-dock {
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  box-shadow: none !important;
+}
+.voice-context-dock .voice-room-icon {
+  background: var(--vybe-orange) !important;
+  color: #16100a !important;
+}
+.voice-context-dock button {
+  border-color: var(--vybe-line);
+}
+.voice-context-dock button:hover {
+  background: var(--vybe-hover);
+}
+.voice-context-settings {
+  border-top: 1px solid var(--vybe-line);
+}
+.vybe-call-mini {
+  width: min(92vw, 320px) !important;
+  border: 1px solid var(--vybe-line) !important;
+  border-radius: 15px !important;
+  background: rgba(20, 20, 23, 0.96) !important;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.4) !important;
+}
+
+.command-call-stage {
+  background:
+    radial-gradient(
+      900px 480px at 50% -24%,
+      rgba(255, 133, 10, 0.09),
+      transparent 68%
+    ),
+    #09090b !important;
+}
+.command-call-header,
+.command-call-dock {
+  border-color: var(--vybe-line) !important;
+  background: rgba(18, 18, 20, 0.94) !important;
+  backdrop-filter: blur(22px);
+}
+.command-call-header {
+  border-bottom: 1px solid var(--vybe-line);
+}
+.command-call-dock {
+  border-top: 1px solid var(--vybe-line);
+}
+.command-call-dock::before {
+  content: none !important;
+}
+.command-call-stage main > div.rounded-2xl {
+  border-color: var(--vybe-line) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.modern-central-trigger,
+.vybe-command-trigger,
+.vybe-decisions-trigger,
+.vybe-direct-trigger {
+  display: none !important;
+}
+.modern-collaboration-drawer,
+.vybe-direct-drawer,
+.vybe-decisions-drawer {
+  border-color: var(--vybe-line) !important;
+  background: rgba(20, 20, 23, 0.98) !important;
+  backdrop-filter: blur(24px);
+}
+.vybe-command-palette {
+  border-color: var(--vybe-line) !important;
+  background: #17171a !important;
+}
+.cyber-grid > .command-telemetry-rail,
+.cyber-grid .xl\:block {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .vybe-shell {
+    height: 100vh;
+  }
+  .vybe-composer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+  }
+}
+
+@media (max-width: 767px) {
+  .vybe-sidebar {
+    width: min(88vw, 310px) !important;
+  }
+  .vybe-timeline-scroll {
+    padding: 8px 12px 4px !important;
+  }
+  .vybe-channel-intro {
+    padding: 10px 4px 14px !important;
+  }
+  .vybe-channel-intro h2 {
+    font-size: 19px !important;
+  }
+  .vybe-composer {
+    padding: 8px 12px 12px !important;
+  }
+  .vybe-message {
+    padding-inline: 5px !important;
+  }
+  .vybe-message-actions {
+    opacity: 1;
+  }
+  .vybe-utility-nav {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}

@@ -1,6 +1,9 @@
 # VybeChat Realtime Worker
 
-Este Worker substitui Socket.io somente na camada de presença e sinalização WebRTC. Ele não carrega vídeo, áudio ou tela; a mídia permanece peer-to-peer nos navegadores.
+Este Worker cuida de presença, chat e metadados das salas. A mídia principal usa
+Cloudflare RealtimeKit/SFU: o Worker cria ou reutiliza uma reunião por canal e
+emite um token novo para cada entrada. O motor WebRTC peer-to-peer permanece como
+rollback automático enquanto o RealtimeKit não estiver configurado.
 
 ## Implantação no painel Cloudflare
 
@@ -57,6 +60,31 @@ de barrar quem tem acesso legitimo.
 
 `VYBECHAT_ADMIN_SLUGS` segue funcionando para quem entrar por esse caminho.
 
+## RealtimeKit / chamada em SFU
+
+Crie um App em **Cloudflare Dashboard > Realtime > RealtimeKit**. O App criado
+pelo painel já inclui presets padrão; confirme que existe o preset
+`group-call-host` ou defina o nome usado pela equipe em
+`REALTIMEKIT_PRESET_NAME`.
+
+Configure o Worker sem colocar o token no frontend:
+
+```bash
+npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
+npx wrangler secret put REALTIMEKIT_APP_ID
+npx wrangler secret put CLOUDFLARE_REALTIME_API_TOKEN
+npx wrangler secret put REALTIMEKIT_PRESET_NAME
+```
+
+O token da API precisa da permissão **Realtime Admin**. Depois do deploy,
+`GET /health` informa `"callEngine":"realtimekit"`. O endpoint
+`POST /calls/session` valida o mesmo código interno da equipe, reutiliza a
+reunião associada ao canal e devolve um token de participante de uso único.
+
+No projeto Pages, mantenha `VITE_CALL_ENGINE=auto` durante a transição. Para
+exigir SFU sem fallback, use `VITE_CALL_ENGINE=realtimekit`. Para rollback
+emergencial, use `VITE_CALL_ENGINE=legacy` e gere um novo build.
+
 ## O que o Worker garante
 
 - Nenhum evento e aceito antes de um `presence:join` valido: sem o codigo correto
@@ -70,6 +98,13 @@ O codigo e compartilhado por toda a equipe: ele barra quem esta de fora, mas nao
 impede que um integrante entre com o nome de outro. Uma sessao por pessoa exige
 token individual emitido no login, o que ainda nao existe.
 
-## Limite do MVP
+## Divisão de responsabilidades
 
-Esta implementação é pensada para uma equipe pequena. Ela mantém os participantes de uma sala em um Durable Object e distribui apenas eventos de presença, mensagem, digitação e sinalização. Para ambientes de rede restritos, uma futura etapa pode adicionar TURN para ampliar a taxa de conexão das chamadas.
+- Durable Object: presença, chat, canais, convites, mão levantada e o vínculo
+  persistente entre canal e reunião.
+- RealtimeKit: sessão, reconexão e roteamento de áudio, vídeo e tela pelo SFU.
+- Motor legado: somente rollback; usa TURN quando `VITE_TURN_*` estiver definido.
+
+Credenciais TURN estáticas no build antigo continuam aceitas apenas para o
+rollback. O caminho RealtimeKit obtém conectividade e relay pela própria sessão
+gerenciada e não expõe segredo TURN no bundle.

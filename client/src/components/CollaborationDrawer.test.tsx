@@ -27,7 +27,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe("CollaborationDrawer", () => {
   it("abre a central e aciona busca, push-to-talk e convite", () => {
     render(<CollaborationDrawer {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "Central" }));
+    fireEvent.click(screen.getByRole("button", { name: "Detalhes" }));
     fireEvent.change(screen.getByPlaceholderText("Buscar transmissões"), { target: { value: "decisão" } });
     fireEvent.click(screen.getByRole("button", { name: /Push-to-talk/ }));
     fireEvent.change(screen.getByDisplayValue("Espaço"), { target: { value: "KeyV" } });
@@ -40,7 +40,7 @@ describe("CollaborationDrawer", () => {
 
   it("aciona reações, pin e resposta de thread em mensagens recentes", () => {
     render(<CollaborationDrawer {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "Central" }));
+    fireEvent.click(screen.getByRole("button", { name: "Detalhes" }));
     fireEvent.click(screen.getByRole("button", { name: /👍 0/ }));
     fireEvent.click(screen.getAllByRole("button").find(button => button.innerHTML.includes("pin"))!);
     expect(onReact).toHaveBeenCalledWith("m1", "👍");

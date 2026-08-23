@@ -1,0 +1,10 @@
+VYBECHAT_WORKSPACE_CODE=troque-este-codigo
+VYBECHAT_ADMIN_SLUGS=
+VYBECHAT_TEAM_MONDAY_IDS=
+VYBECHAT_ADMIN_MONDAY_IDS=
+
+# RealtimeKit: crie um App e use um token com permissão Realtime Admin.
+CLOUDFLARE_ACCOUNT_ID=seu-account-id
+REALTIMEKIT_APP_ID=seu-app-id
+CLOUDFLARE_REALTIME_API_TOKEN=seu-token
+REALTIMEKIT_PRESET_NAME=group-call-host

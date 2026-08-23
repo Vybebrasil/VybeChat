@@ -33,8 +33,8 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Streamdown } from "streamdown";
+import { FormEvent, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+const Streamdown = lazy(() => import("streamdown").then(m => ({ default: m.Streamdown })));
 
 type Presence = { userId: string; name: string; status: "online" | "away" | "offline" };
 type RemoteStream = { socketId: string; stream: MediaStream };
@@ -526,7 +526,7 @@ export default function Home() {
                       {messagesQuery.data.map(message => (
                         <article key={message.id} className="group flex gap-3.5">
                           <Avatar className="mt-0.5 size-9 shrink-0 border border-violet-200/15"><AvatarFallback className="bg-violet-400/12 text-xs font-bold text-violet-100">{initials(message.authorName)}</AvatarFallback></Avatar>
-                          <div className="min-w-0"><div className="flex items-baseline gap-2"><p className="text-sm font-bold text-white">{message.authorName || "Operador Vybe"}</p><time className="font-mono text-[10px] text-slate-600">{new Date(message.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time></div><div className="prose prose-sm prose-invert mt-1 max-w-none break-words text-slate-300 prose-p:my-0 prose-strong:text-violet-100"><Streamdown>{message.content}</Streamdown></div></div>
+                          <div className="min-w-0"><div className="flex items-baseline gap-2"><p className="text-sm font-bold text-white">{message.authorName || "Operador Vybe"}</p><time className="font-mono text-[10px] text-slate-600">{new Date(message.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time></div><div className="prose prose-sm prose-invert mt-1 max-w-none break-words text-slate-300 prose-p:my-0 prose-strong:text-violet-100"><Suspense fallback={<span className="text-stone-500">Renderizando...</span>}><Streamdown>{message.content}</Streamdown></Suspense></div></div>
                         </article>
                       ))}
                     </div>

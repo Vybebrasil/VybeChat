@@ -7,6 +7,9 @@ class WorkerRealtimeSocket {
   private socket: WebSocket | null = null;
   private handlers: EventRegistry = new Map();
   private reconnectTimer: number | null = null;
+  private heartbeatTimer: number | null = null;
+  private reconnectAttempt = 0;
+  private lastMessageAt = 0;
   private shouldReconnect = false;
 
   on(event: string, handler: RealtimeEventHandler) {
@@ -43,9 +46,13 @@ class WorkerRealtimeSocket {
     this.socket = new WebSocket(toWorkerWebSocketUrl(workerUrl));
     this.socket.addEventListener("open", () => {
       this.connected = true;
+      this.reconnectAttempt = 0;
+      this.lastMessageAt = Date.now();
+      this.startHeartbeat();
       this.dispatch("connect");
     });
     this.socket.addEventListener("message", event => {
+      this.lastMessageAt = Date.now();
       try {
         const message = parseWorkerRealtimeMessage(String(event.data));
         this.dispatch(message.type, message.payload);
@@ -55,6 +62,7 @@ class WorkerRealtimeSocket {
     });
     this.socket.addEventListener("close", () => {
       this.connected = false;
+      this.stopHeartbeat();
       this.dispatch("disconnect");
       if (this.shouldReconnect) this.scheduleReconnect();
     });
@@ -68,6 +76,7 @@ class WorkerRealtimeSocket {
     this.shouldReconnect = false;
     if (this.reconnectTimer) window.clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.stopHeartbeat();
     this.socket?.close();
     this.socket = null;
     this.connected = false;
@@ -76,15 +85,43 @@ class WorkerRealtimeSocket {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
+    const delay = reconnectDelay(this.reconnectAttempt);
+    this.reconnectAttempt += 1;
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
-    }, 1200);
+    }, delay);
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = window.setInterval(() => {
+      const socket = this.socket;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      // Um Wi-Fi que morre sem FIN deixa o browser acreditando que o WebSocket
+      // segue aberto. O ping detecta essa meia-conexão e força o fluxo normal de
+      // reconexão, que reentra na sala e recria os pares legados.
+      if (Date.now() - this.lastMessageAt > 45_000) {
+        socket.close(4000, "heartbeat timeout");
+        return;
+      }
+      socket.send(JSON.stringify({ type: "system:ping", payload: { at: Date.now() } }));
+    }, 15_000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatTimer) window.clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
   }
 
   private dispatch(event: string, payload?: unknown) {
     this.handlers.get(event)?.forEach(handler => handler(payload));
   }
+}
+
+export function reconnectDelay(attempt: number, random = Math.random()) {
+  const base = Math.min(1000 * (2 ** Math.max(0, attempt)), 15_000);
+  return Math.round(base * (0.8 + Math.max(0, Math.min(1, random)) * 0.4));
 }
 
 let socket: WorkerRealtimeSocket | null = null;

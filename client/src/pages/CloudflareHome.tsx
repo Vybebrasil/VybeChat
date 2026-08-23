@@ -160,6 +160,7 @@ const WORKSPACE_CODE_KEY = "vybechat-workspace-code";
 const GATE_KEY = "vybechat-gate-sensitivity";
 const GATE_SCALE_KEY = "vybechat-gate-scale";
 const SCREEN_QUALITY_KEY = "vybechat-screen-quality";
+const AUDIO_CONFIG_KEY = "vybechat-audio-config";
 const CALL_NOTICE_PATTERN =
   /microfone|chamada|compartilh|m[ií]dia|[aá]udio|conex[aã]o|sfu/i;
 
@@ -201,6 +202,30 @@ function initials(name: string) {
       .join("")
       .toUpperCase() || "V"
   );
+}
+
+const AVATAR_COLORS = [
+  "bg-rose-500/10 text-rose-300", 
+  "bg-pink-500/10 text-pink-300", 
+  "bg-fuchsia-500/10 text-fuchsia-300", 
+  "bg-purple-500/10 text-purple-300", 
+  "bg-violet-500/10 text-violet-300",
+  "bg-indigo-500/10 text-indigo-300", 
+  "bg-blue-500/10 text-blue-300", 
+  "bg-sky-500/10 text-sky-300", 
+  "bg-cyan-500/10 text-cyan-300", 
+  "bg-teal-500/10 text-teal-300",
+  "bg-emerald-500/10 text-emerald-300", 
+  "bg-green-500/10 text-green-300", 
+  "bg-lime-500/10 text-lime-300", 
+  "bg-orange-500/10 text-orange-300", 
+  "bg-amber-500/10 text-amber-300"
+];
+
+function avatarColorClass(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 function directThreadId(firstUserId: string, secondUserId: string) {
@@ -279,6 +304,13 @@ export default function CloudflareHome() {
   const [unread, setUnread] = useState<UnreadMap>({});
   const [microphoneOn, setMicrophoneOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
+  const [audioConfig, setAudioConfig] = useState(() => {
+    try {
+      const val = localStorage.getItem(AUDIO_CONFIG_KEY);
+      if (val) return JSON.parse(val);
+    } catch {}
+    return { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  });
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [screenSharer, setScreenSharer] = useState<string | null>(null);
   const [screenSharerId, setScreenSharerId] = useState<string | null>(null);
@@ -328,6 +360,7 @@ export default function CloudflareHome() {
   >({});
   const [audioInputs, setAudioInputs] = useState<AudioInput[]>([]);
   const [selectedAudioInput, setSelectedAudioInput] = useState("");
+  const [selectedVideoInput, setSelectedVideoInput] = useState("");
   const [preflightChannelId, setPreflightChannelId] = useState<number | null>(
     null
   );
@@ -1853,6 +1886,9 @@ export default function CloudflareHome() {
     setMobileSidebarOpen(false);
     socketRef.current.emit("call:join", { channelId, mediaEngine: "legacy" });
   };
+  useEffect(() => {
+    localStorage.setItem(AUDIO_CONFIG_KEY, JSON.stringify(audioConfig));
+  }, [audioConfig]);
 
   const joinVoice = async (
     channelId: number,
@@ -1891,6 +1927,7 @@ export default function CloudflareHome() {
         audioInputId: selection.audioInputId,
         videoInputId: selection.videoInputId,
         screenQuality,
+        audioConfig,
       });
       activeCallRef.current = channelId;
       callEngineRef.current = "realtimekit";
@@ -1955,6 +1992,24 @@ export default function CloudflareHome() {
         isMuted: !next,
         isSpeaking: false,
       });
+  };
+
+  const changeAudioDevice = async (deviceId: string) => {
+    setSelectedAudioInput(deviceId);
+    if (callEngineRef.current === "realtimekit") {
+      void realtimeKitRef.current.changeAudioInput(deviceId).catch(error => {
+        setNotice(error instanceof Error ? error.message : "Não foi possível trocar o microfone.");
+      });
+    }
+  };
+
+  const changeVideoDevice = async (deviceId: string) => {
+    setSelectedVideoInput(deviceId);
+    if (callEngineRef.current === "realtimekit") {
+      void realtimeKitRef.current.changeVideoInput(deviceId).catch(error => {
+        setNotice(error instanceof Error ? error.message : "Não foi possível trocar a câmera.");
+      });
+    }
   };
 
   const unblockAudio = () => {
@@ -2349,8 +2404,8 @@ export default function CloudflareHome() {
               className="rounded-xl object-cover"
             />
           ) : null}
-          <AvatarFallback className="rounded-xl bg-orange-500/10 text-xs text-orange-100">
-            {initials(profile.name)}
+          <AvatarFallback className={`rounded-xl text-xs ${avatarColorClass(profile?.name || "Vybe")}`}>
+            {initials(profile?.name || "")}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
@@ -2417,6 +2472,10 @@ export default function CloudflareHome() {
         onJoinVoice={prepareVoice}
         onOpenDirect={openDirectMessage}
         onOpenCentral={() => openWorkspaceSurface("collaboration")}
+        status={status}
+        onSetStatus={setStatus}
+        microphoneOn={microphoneOn}
+        onToggleMic={toggleMic}
       />
       <DecisionsDrawer
         hideTrigger
@@ -2477,6 +2536,37 @@ export default function CloudflareHome() {
           </header>
 
           <section className="vybe-channel-content flex min-h-0 min-w-0 flex-1 flex-col">
+            {activeCallChannelId && callStageOpen && (
+              <CallStage
+                mode="split"
+                roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"}
+                participants={stageParticipants}
+                microphoneOn={callMicrophoneOn}
+                cameraOn={callCameraOn}
+                sharingScreen={callScreenSharing}
+                handRaised={handRaised}
+                diagnostics={callDiagnostics}
+                canModerate={currentRole === "admin" || currentRole === "moderator"}
+                onMuteParticipant={muteParticipant}
+                gateSensitivity={gateSensitivity}
+                onGateSensitivityChange={setGateSensitivity}
+                micLevel={micLevel}
+                onToggleMic={toggleMic}
+                onToggleCamera={toggleCamera}
+                onChangeAudioDevice={changeAudioDevice}
+                onChangeVideoDevice={changeVideoDevice}
+                activeAudioDeviceId={selectedAudioInput}
+                activeVideoDeviceId={selectedVideoInput}
+                audioConfig={audioConfig}
+                onAudioConfigChange={setAudioConfig}
+                onShareScreen={shareScreen}
+                onOpenMusic={() => setMusicOpen(true)}
+                musicActive={Boolean(visibleMusicState?.queue.length)}
+                onToggleHandRaise={toggleHandRaise}
+                onLeave={leaveVoice}
+                onMinimize={() => setCallStageOpen(false)}
+              />
+            )}
             <div className="vybe-timeline-scroll flex-1 overflow-y-auto">
               <div className="vybe-channel-container mx-auto">
                 {channelMessages.length ? (
@@ -2497,7 +2587,7 @@ export default function CloudflareHome() {
                         )}
                         <article className="vybe-message flex gap-3">
                           <Avatar className="size-9 shrink-0">
-                            <AvatarFallback className="rounded-xl bg-orange-500/10 text-xs text-orange-100">
+                            <AvatarFallback className={`rounded-xl text-xs ${avatarColorClass(message.authorName)}`}>
                               {initials(message.authorName)}
                             </AvatarFallback>
                           </Avatar>
@@ -2590,20 +2680,30 @@ export default function CloudflareHome() {
                     ))}
                   </div>
                 ) : (
-                  <div className="vybe-empty-state relative mt-4 overflow-hidden border p-7 sm:p-9">
-                    <div className="absolute right-6 top-2 text-7xl font-bold text-orange-400/10">
-                      #
+                  <div className="vybe-empty-state relative mt-8 flex flex-col items-center justify-center px-4 py-12 text-center sm:px-8">
+                    <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-b from-orange-500/5 to-transparent blur-2xl" />
+                    <div className="grid size-16 place-items-center rounded-3xl border border-orange-500/20 bg-gradient-to-b from-orange-400/20 to-orange-500/5 text-orange-400 shadow-xl shadow-orange-900/20">
+                      <Hash className="size-8" />
                     </div>
-                    <div className="grid size-12 place-items-center rounded-2xl bg-orange-500/10 text-orange-400">
-                      <Hash className="size-6" />
-                    </div>
-                    <h2 className="mt-5 text-xl font-semibold text-white">
-                      Comece em #{selectedChannel?.name}
+                    <h2 className="mt-6 text-2xl font-bold tracking-tight text-white">
+                      Bem-vindo a <span className="text-orange-400">#{selectedChannel?.name}</span>
                     </h2>
-                    <p className="mt-2 max-w-md text-sm leading-6 text-stone-400">
-                      Envie a primeira mensagem, registre uma decisão ou abra
-                      uma chamada com a equipe.
+                    <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-400">
+                      Este é o início do canal. Envie a primeira mensagem para a equipe, compartilhe atualizações ou inicie uma chamada de voz para alinhar os próximos passos.
                     </p>
+                    <div className="mt-8">
+                      <button
+                        onClick={() => {
+                          if (selectedChannel && activeCallChannelId !== selectedChannel.id) {
+                            setPreflightChannelId(selectedChannel.id);
+                          }
+                        }}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-orange-400"
+                      >
+                        <Phone className="size-4" />
+                        Iniciar Chamada
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2744,30 +2844,7 @@ export default function CloudflareHome() {
           </div>
         </button>
       )}
-      {activeCallChannelId && callStageOpen && (
-        <CallStage
-          roomName={findExternalChannel(activeCallChannelId)?.name ?? "Chamada"}
-          participants={stageParticipants}
-          microphoneOn={callMicrophoneOn}
-          cameraOn={callCameraOn}
-          sharingScreen={callScreenSharing}
-          handRaised={handRaised}
-          diagnostics={callDiagnostics}
-          canModerate={currentRole === "admin" || currentRole === "moderator"}
-          onMuteParticipant={muteParticipant}
-          gateSensitivity={gateSensitivity}
-          onGateSensitivityChange={setGateSensitivity}
-          micLevel={micLevel}
-          onToggleMic={toggleMic}
-          onToggleCamera={toggleCamera}
-          onShareScreen={shareScreen}
-          onOpenMusic={() => setMusicOpen(true)}
-          musicActive={Boolean(visibleMusicState?.queue.length)}
-          onToggleHandRaise={toggleHandRaise}
-          onLeave={leaveVoice}
-          onMinimize={() => setCallStageOpen(false)}
-        />
-      )}
+
       {activeCallChannelId && (
         <MusicRoomPanel
           open={musicOpen}
