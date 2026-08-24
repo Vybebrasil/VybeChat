@@ -90,7 +90,7 @@ export function MediaTile({
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
       onClick={onSelect} 
-      className={`relative overflow-hidden rounded-2xl border bg-[#0b0a08] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-orange-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-orange-400/80 shadow-[0_0_28px_rgba(255,126,18,.26)]" : "border-orange-200/15"} ${className}`}
+      className={`relative group overflow-hidden rounded-2xl border bg-[#0b0a08] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-orange-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-orange-400/80 shadow-[0_0_28px_rgba(255,126,18,.26)]" : "border-orange-200/15"} ${className}`}
     >
       {stream && cameraOn ? (
         <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
@@ -116,7 +116,13 @@ export function MediaTile({
           {!cameraOn && <VideoOff className="size-4" />}
         </span>
       </div>
-      {onVolumeChange && <label className="absolute inset-x-3 bottom-11 flex items-center gap-2 rounded-lg bg-black/55 px-2 py-1.5 text-white/75"><Volume2 className="size-3.5 shrink-0" /><input aria-label={`Volume de ${label}`} type="range" min="0" max="150" value={normalizeParticipantVolume(volume)} onChange={event => onVolumeChange(normalizeParticipantVolume(Number(event.target.value)))} className="h-1 w-full accent-orange-400" /><span className="w-8 text-right font-mono text-[10px]">{normalizeParticipantVolume(volume)}%</span></label>}
+      {onVolumeChange && (
+        <label className="absolute inset-x-3 top-3 flex items-center gap-2 rounded-lg bg-black/60 px-2 py-1.5 text-white/75 opacity-0 transition-opacity hover:bg-black/80 group-hover:opacity-100">
+          <Volume2 className="size-3.5 shrink-0" />
+          <input aria-label={`Volume de ${label}`} type="range" min="0" max="150" value={normalizeParticipantVolume(volume)} onChange={event => onVolumeChange(normalizeParticipantVolume(Number(event.target.value)))} className="h-1 w-full accent-orange-400" />
+          <span className="w-8 text-right font-mono text-[10px]">{normalizeParticipantVolume(volume)}%</span>
+        </label>
+      )}
       <div className="absolute left-3 top-3 flex gap-1.5">{sharingScreen && <span className="rounded-full border border-orange-200/30 bg-orange-500/90 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-black">Tela ao vivo</span>}{speaking && <span className="rounded-full border border-emerald-200/25 bg-emerald-400/85 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-slate-950">Falando</span>}</div>
       {canPip && stream && cameraOn && (
         <button 
