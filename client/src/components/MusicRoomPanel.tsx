@@ -360,7 +360,7 @@ export function MusicRoomPanel({
       }
       loadedSourceRef.current = sourceKey;
     } else {
-      if (Math.abs(player.getCurrentTime() - expected) > 2.2)
+      if (Math.abs(player.getCurrentTime() - expected) > 1.2)
         player.seekTo(expected, true);
       if (musicState.playing) player.playVideo();
       else player.pauseVideo();
@@ -389,7 +389,7 @@ export function MusicRoomPanel({
       if (
         !isBufferingOrTransitioning &&
         isPlaylistIndexSync &&
-        Math.abs(time - expected) > 2.5
+        Math.abs(time - expected) > 1.5
       ) {
         suppressRemoteEvents();
         player.seekTo(expected, true);

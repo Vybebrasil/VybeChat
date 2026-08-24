@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { toMediaElementVolume } from "@/lib/participant-volume";
+import { createSpeakingDetector } from "@/lib/speaking-detector";
 
 type RemoteAudio = {
   socketId: string;
@@ -10,10 +11,11 @@ type CallAudioSinkProps = {
   streams: RemoteAudio[];
   volumes: Record<string, number>;
   onBlocked?: (blocked: boolean) => void;
+  onSpeakerChange?: (socketId: string, speaking: boolean) => void;
 };
 
 /**
- * Reproduz o áudio de todos os participantes remotos.
+ * Reproduz o áudio de todos os participantes remotos e detecta quem está falando.
  *
  * Antes o <audio> vivia dentro do MediaTile, que só é montado quando a tela
  * cheia da chamada está aberta — e, com ela fechada, o único tile renderizado é
@@ -24,22 +26,24 @@ type CallAudioSinkProps = {
  * Este sink fica montado enquanto a chamada existir, independente da interface,
  * e nunca é remontado por mudança de layout.
  */
-export function CallAudioSink({ streams, volumes, onBlocked }: CallAudioSinkProps) {
+export function CallAudioSink({ streams, volumes, onBlocked, onSpeakerChange }: CallAudioSinkProps) {
   return (
     <div aria-hidden="true" className="sr-only">
       {streams.map(item => (
         <PeerAudio
           key={item.socketId}
+          socketId={item.socketId}
           stream={item.stream}
           volume={volumes[item.socketId] ?? 100}
           onBlocked={onBlocked}
+          onSpeakerChange={onSpeakerChange}
         />
       ))}
     </div>
   );
 }
 
-function PeerAudio({ stream, volume, onBlocked }: { stream: MediaStream; volume: number; onBlocked?: (blocked: boolean) => void }) {
+function PeerAudio({ socketId, stream, volume, onBlocked, onSpeakerChange }: { socketId: string; stream: MediaStream; volume: number; onBlocked?: (blocked: boolean) => void; onSpeakerChange?: (socketId: string, speaking: boolean) => void }) {
   const ref = useRef<HTMLAudioElement>(null);
   // `onBlocked` chega como função nova a cada render do app. Se ela entrar nas
   // dependências do efeito, todo render reatribui o srcObject e chama play() de
@@ -81,6 +85,16 @@ function PeerAudio({ stream, volume, onBlocked }: { stream: MediaStream; volume:
       stream.removeEventListener("addtrack", attempt);
     };
   }, [stream]);
+
+  const onSpeakerChangeRef = useRef(onSpeakerChange);
+  useEffect(() => { onSpeakerChangeRef.current = onSpeakerChange; }, [onSpeakerChange]);
+
+  useEffect(() => {
+    return createSpeakingDetector({
+      stream,
+      onChange: (speaking) => onSpeakerChangeRef.current?.(socketId, speaking),
+    }) ?? undefined;
+  }, [stream, socketId]);
 
   useEffect(() => {
     if (ref.current) ref.current.volume = toMediaElementVolume(volume);

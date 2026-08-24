@@ -39,16 +39,33 @@ export function MediaTile({
   connectionQuality = "stable",
 }: MediaTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLElement>(null);
   const [canPip, setCanPip] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     setCanPip(typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && !!document.pictureInPictureEnabled);
   }, []);
 
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsVisible(entry.isIntersecting);
+    }, { threshold: 0 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!videoRef.current) return;
-    if (videoRef.current.srcObject !== stream) videoRef.current.srcObject = stream;
-  }, [stream, cameraOn]);
+    if (isVisible && stream) {
+      if (videoRef.current.srcObject !== stream) videoRef.current.srcObject = stream;
+      void videoRef.current.play().catch(() => {});
+    } else {
+      videoRef.current.srcObject = null;
+    }
+  }, [stream, cameraOn, isVisible]);
 
   const togglePip = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -65,7 +82,8 @@ export function MediaTile({
   };
 
   return (
-    <motion.article 
+    <motion.article
+      ref={containerRef as any}
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}

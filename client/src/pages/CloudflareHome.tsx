@@ -285,6 +285,7 @@ export default function CloudflareHome() {
   const [remoteVolumes, setRemoteVolumes] = useState<Record<string, number>>(
     {}
   );
+  const [remoteSpeakers, setRemoteSpeakers] = useState<Set<string>>(new Set());
   // O navegador pode recusar o autoplay do audio. Antes o erro era engolido e a
   // pessoa simplesmente nao ouvia ninguem, sem nenhuma pista do motivo.
   const [audioBlocked, setAudioBlocked] = useState(false);
@@ -1476,7 +1477,7 @@ export default function CloudflareHome() {
           isLocal: participant.isLocal,
           cameraOn: participant.cameraOn,
           microphoneOn: participant.microphoneOn,
-          speaking: participant.speaking || Boolean(member?.isSpeaking),
+          speaking: participant.speaking || Boolean(member?.isSpeaking) || remoteSpeakers.has(participant.id),
           handRaised: participant.isLocal
             ? handRaised
             : Boolean(member?.handRaised),
@@ -2816,6 +2817,14 @@ export default function CloudflareHome() {
           streams={callRemoteStreams}
           volumes={remoteVolumes}
           onBlocked={blocked => setAudioBlocked(blocked)}
+          onSpeakerChange={(socketId, speaking) => {
+            setRemoteSpeakers(prev => {
+              const next = new Set(prev);
+              if (speaking) next.add(socketId);
+              else next.delete(socketId);
+              return next;
+            });
+          }}
         />
       )}
       {activeCallChannelId && callAudioBlocked && (
