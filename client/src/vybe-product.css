@@ -87,6 +87,25 @@
   background: rgba(0, 0, 0, 0.1) !important;
 }
 
+/* Sidebar Nav Groups */
+.cyber-label,
+.command-nav-group > p {
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #65656d;
+  margin-bottom: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.command-nav-group {
+  margin-bottom: 18px;
+}
+.command-nav-group > p {
+  margin: 0 10px 7px;
+}
+
 /* Channel selection glow */
 .command-nav-channel > button {
   position: relative;
@@ -140,6 +159,22 @@
 }
 .command-nav-channel > button.is-active svg {
   color: var(--vybe-neon-orange);
+}
+
+.command-voice-member {
+  display: flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 7px;
+  margin-left: 30px;
+  padding-right: 10px;
+  color: #85858e;
+  font-size: 11px;
+}
+.command-voice-member span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Message Bubbles */
