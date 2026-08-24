@@ -1,450 +1,228 @@
+/* Core Apple Cyberpunk Theme variables */
 :root {
-  --vybe-bg: #000000;
-  --vybe-sidebar: rgba(0, 0, 0, 0.3);
-  --vybe-surface: rgba(15, 15, 18, 0.4);
-  --vybe-surface-raised: rgba(25, 25, 30, 0.6);
-  --vybe-hover: rgba(255, 255, 255, 0.05);
-  --vybe-line: rgba(255, 255, 255, 0.05);
-  --vybe-line-strong: rgba(255, 255, 255, 0.1);
-  --vybe-text: #f5f5f7;
-  --vybe-muted: #95959e;
-  --vybe-subtle: #65656d;
-  --vybe-orange: #ff7e12;
-  --vybe-orange-soft: rgba(255, 126, 18, 0.12);
-  --vybe-danger: #f43f5e;
+  --vybe-neon-orange: #ff6a00;
+  --vybe-neon-pink: #e52e71;
+  --vybe-glass-bg: rgba(18, 18, 22, 0.55);
+  --vybe-glass-border: rgba(255, 255, 255, 0.07);
+  --vybe-glass-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-html,
-body,
-#root {
-  min-height: 100%;
-  background: var(--vybe-bg);
-}
-body {
-  color: var(--vybe-text);
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-.vybe-cyber-grid {
-  background-size: 24px 24px;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
-}
-
-* {
-  scrollbar-color: rgba(255, 126, 18, 0.4) transparent;
-  scrollbar-width: thin;
-}
-*::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 126, 18, 0.3);
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 126, 18, 0.8);
-  box-shadow: 0 0 10px rgba(255, 126, 18, 0.5);
-}
-
+/* Core Layout & Background */
 .vybe-app {
-  min-height: 100vh;
-  gap: 0 !important;
-  padding: 0 !important;
-  background:
-    radial-gradient(
-      900px 520px at 58% -32%,
-      rgba(255, 133, 10, 0.08),
-      transparent 68%
-    ),
-    var(--vybe-bg) !important;
+  background: #030304; /* Deepest OLED black */
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
 }
-.vybe-shell {
-  min-width: 0;
-  min-height: 100vh;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #0b0b0d !important;
-  box-shadow: none !important;
+
+/* Cyberpunk Glowing Orbs (Pseudo-elements on the app container) */
+.vybe-app::before,
+.vybe-app::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.35;
 }
+.vybe-app::before {
+  width: 500px;
+  height: 500px;
+  background: var(--vybe-neon-orange);
+  top: -150px;
+  right: -100px;
+}
+.vybe-app::after {
+  width: 600px;
+  height: 600px;
+  background: var(--vybe-neon-pink);
+  bottom: -200px;
+  left: -200px;
+}
+
+/* Ensure children sit above the glow */
+.vybe-app > * {
+  z-index: 1;
+}
+
+/* Glassmorphism Sidebar */
 .vybe-sidebar {
-  background: var(--vybe-sidebar) !important;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  width: 290px;
-  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(10, 10, 12, 0.3) !important;
+  backdrop-filter: blur(50px) saturate(180%);
+  -webkit-backdrop-filter: blur(50px) saturate(180%);
+  border-right: 1px solid var(--vybe-glass-border);
 }
-.vybe-sidebar-brand {
-  min-height: 108px;
-  border-color: var(--vybe-line) !important;
+
+/* Main Chat Glass Container (Floating on Desktop) */
+@media (min-width: 768px) {
+  .vybe-app {
+    padding: 16px 16px 16px 0;
+  }
+  .vybe-sidebar {
+    border-right: none;
+  }
+  .vybe-channel-container {
+    background: var(--vybe-glass-bg);
+    backdrop-filter: blur(40px) saturate(150%);
+    -webkit-backdrop-filter: blur(40px) saturate(150%);
+    border: 1px solid var(--vybe-glass-border);
+    border-radius: 28px;
+    height: calc(100vh - 32px);
+    box-shadow: var(--vybe-glass-shadow);
+    overflow: hidden;
+  }
 }
-.vybe-sidebar-scroll {
-  min-height: 0;
-  padding: 14px 10px 8px;
+
+@media (max-width: 767px) {
+  .vybe-channel-container {
+    background: rgba(12, 12, 15, 0.4);
+    backdrop-filter: blur(20px);
+    width: 100%;
+  }
 }
-.cyber-label,
-.command-nav-group > p {
-  padding: 0 10px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--vybe-subtle);
-  margin-bottom: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+/* Channel Header */
+.vybe-channel-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  background: rgba(0, 0, 0, 0.1) !important;
 }
-.command-nav-group {
-  margin-bottom: 18px;
-}
-.command-nav-group > p {
-  margin: 0 10px 7px;
-}
+
+/* Channel selection glow */
 .command-nav-channel > button {
-  display: flex;
-  width: 100%;
-  height: 38px;
-  align-items: center;
-  gap: 9px;
-  border: 0;
-  border-radius: 9px;
-  padding: 0 10px;
-  color: #b1b1b9;
-  text-align: left;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
+  position: relative;
+  transition: all 0.2s ease;
+  border-radius: 12px;
+  margin: 0 8px;
+  width: calc(100% - 16px);
 }
 .command-nav-channel > button:hover {
-  background: var(--vybe-hover);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
 }
 .command-nav-channel > button.is-active {
-  background: linear-gradient(90deg, rgba(255, 126, 18, 0.15) 0%, transparent 100%);
-  color: #fff;
-  border-left: 2px solid var(--vybe-orange);
-  padding-left: 6px;
-  box-shadow: inset 20px 0 20px -20px rgba(255, 126, 18, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  border-left: none;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,0.08), 0 4px 12px rgba(0,0,0,0.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding-left: 12px;
+}
+.command-nav-channel > button.is-active::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background: var(--vybe-neon-orange);
+  border-radius: 4px;
+  box-shadow: 0 0 12px var(--vybe-neon-orange);
 }
 .command-nav-channel > button.is-active svg {
-  color: var(--vybe-orange);
-  filter: drop-shadow(0 0 6px rgba(255, 126, 18, 0.6));
-}
-.command-nav-channel > button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-}
-.command-nav-channel > button em {
-  margin-left: auto;
-  color: var(--vybe-orange);
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 700;
-}
-.command-voice-member {
-  display: flex;
-  min-height: 25px;
-  align-items: center;
-  gap: 7px;
-  margin-left: 30px;
-  padding-right: 10px;
-  color: #85858e;
-  font-size: 11px;
+  color: var(--vybe-neon-orange);
 }
 
-.vybe-utility-nav {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 10px;
-  border-top: 1px solid var(--vybe-line);
-}
-.vybe-utility-nav button {
-  display: flex;
-  min-width: 0;
-  height: 36px;
-  align-items: center;
-  gap: 7px;
-  border-radius: 9px;
-  padding: 0 9px;
-  color: #a9a9b1;
-  font-size: 11px;
-  font-weight: 600;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
-}
-.vybe-utility-nav button:hover {
-  background: var(--vybe-hover);
-  color: #fff;
-}
-.vybe-utility-nav button svg {
-  width: 15px;
-  color: var(--vybe-orange);
-}
-.vybe-utility-nav button span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vybe-channel-header {
-  min-height: 64px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-  background: rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
-}
-.vybe-channel-header h1 {
-  color: var(--vybe-text) !important;
-}
-.vybe-channel-header .vybe-channel-actions button {
-  border-color: var(--vybe-line);
-  color: #c9c9cf;
-}
-.vybe-channel-header .vybe-channel-actions button:hover {
-  border-color: var(--vybe-line-strong);
-  background: var(--vybe-hover);
-  color: #fff;
-}
-.vybe-channel-header .vybe-primary-action {
-  border-color: rgba(255, 133, 10, 0.35) !important;
-  background: var(--vybe-orange-soft) !important;
-  color: #ffd9b0 !important;
-}
-
-.vybe-channel-content {
-  min-height: 0;
-}
-.vybe-timeline-scroll {
-  min-height: 0;
-  padding: 12px 24px 8px !important;
-}
-.vybe-channel-container {
-  width: 100%;
-  max-width: 1120px;
-}
-.vybe-channel-intro {
-  margin-bottom: 8px !important;
-  border: 0 !important;
-  padding: 14px 10px 18px !important;
-}
-.vybe-channel-intro .cyber-label {
-  display: none;
-}
-.vybe-channel-intro h2 {
-  margin-top: 0 !important;
-  color: var(--vybe-text) !important;
-  font-size: 22px !important;
-  font-weight: 650 !important;
-  letter-spacing: -0.025em !important;
-}
-.vybe-channel-intro p:last-child {
-  margin-top: 3px !important;
-  color: var(--vybe-muted) !important;
-  font-size: 13px !important;
-}
-.vybe-message-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px !important;
-}
+/* Message Bubbles */
 .vybe-message {
-  border: 0 !important;
-  border-radius: 9px !important;
-  background: transparent !important;
-  padding: 8px 10px !important;
-  transition: background-color 120ms ease;
-}
-.vybe-message:hover {
-  background: rgba(255, 255, 255, 0.035) !important;
-}
-.vybe-message-actions {
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-.vybe-message:hover .vybe-message-actions,
-.vybe-message:focus-within .vybe-message-actions {
-  opacity: 1;
-}
-.vybe-empty-state {
-  min-height: 230px;
-  border-color: var(--vybe-line) !important;
-  border-radius: 16px !important;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 133, 10, 0.08),
-    rgba(255, 255, 255, 0.018)
-  ) !important;
-}
-.vybe-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid rgba(255, 133, 10, 0.2);
-  border-left: 3px solid var(--vybe-orange);
-  border-radius: 10px;
-  background: rgba(255, 133, 10, 0.08);
-  color: #f4d8ba;
-}
-.vybe-composer {
-  max-width: 1120px !important;
-  padding: 10px 24px 24px !important;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 60%, transparent) !important;
-}
-.vybe-composer textarea {
-  min-height: 50px !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  margin: 4px 16px 8px;
+  padding: 12px 16px !important;
   border-radius: 18px !important;
-  background: rgba(15, 15, 18, 0.5) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--vybe-text) !important;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.4) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.03) !important;
   transition: all 0.2s ease;
 }
-.vybe-composer textarea::placeholder {
-  color: #777780 !important;
-}
-.vybe-composer textarea:focus {
-  border-color: var(--vybe-orange) !important;
-  background: rgba(15, 15, 18, 0.8) !important;
-  box-shadow: 0 0 15px rgba(255, 126, 18, 0.25), inset 0 2px 4px rgba(0,0,0,0.4) !important;
-}
-.vybe-composer button[type="submit"] {
-  width: 50px;
-  height: 50px;
-  border-radius: 14px !important;
-  background: var(--vybe-orange) !important;
-  color: #18110a !important;
-  box-shadow: none !important;
+.vybe-message:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
 }
 
+/* Input Bar - Floating Pill */
+.vybe-composer {
+  padding: 0 24px 24px !important;
+  background: transparent !important;
+}
+
+.vybe-composer textarea {
+  border-radius: 24px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  padding: 16px 64px 16px 20px !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.vybe-composer textarea:focus {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 106, 0, 0.4) !important;
+  box-shadow: 0 12px 40px rgba(255, 106, 0, 0.15), inset 0 0 0 1px rgba(255, 106, 0, 0.3) !important;
+}
+
+/* Neon Send Button */
+.vybe-composer button[type="submit"] {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 18px !important;
+  background: linear-gradient(135deg, var(--vybe-neon-orange), var(--vybe-neon-pink)) !important;
+  box-shadow: 0 4px 20px rgba(255, 106, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.4) !important;
+  border: none !important;
+  color: white !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
+}
+.vybe-composer button[type="submit"]:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 25px rgba(255, 106, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.5) !important;
+}
+.vybe-composer button[type="submit"]:active {
+  transform: scale(0.95);
+}
+
+/* Scrollbar customization for webkit */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Voice & Utility styling */
+.vybe-utility-nav {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
 .voice-context-dock {
-  border: 0 !important;
-  border-radius: 12px !important;
-  background: rgba(255, 255, 255, 0.035) !important;
-  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 16px !important;
+  margin: 16px;
+  backdrop-filter: blur(10px);
 }
 .voice-context-dock .voice-room-icon {
-  background: var(--vybe-orange) !important;
-  color: #16100a !important;
-}
-.voice-context-dock button {
-  border-color: var(--vybe-line);
-}
-.voice-context-dock button:hover {
-  background: var(--vybe-hover);
-}
-.voice-context-settings {
-  border-top: 1px solid var(--vybe-line);
-}
-.vybe-call-mini {
-  width: min(92vw, 320px) !important;
-  border: 1px solid var(--vybe-line) !important;
-  border-radius: 15px !important;
-  background: rgba(20, 20, 23, 0.96) !important;
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.4) !important;
+  background: linear-gradient(135deg, var(--vybe-neon-orange), var(--vybe-neon-pink)) !important;
+  box-shadow: 0 2px 10px rgba(255, 106, 0, 0.3) !important;
+  color: white !important;
 }
 
-.command-call-stage {
-  background:
-    radial-gradient(
-      900px 480px at 50% -24%,
-      rgba(255, 133, 10, 0.09),
-      transparent 68%
-    ),
-    #09090b !important;
-}
-.command-call-header,
-.command-call-dock {
-  border-color: var(--vybe-line) !important;
-  background: rgba(18, 18, 20, 0.94) !important;
-  backdrop-filter: blur(22px);
-}
-.command-call-header {
-  border-bottom: 1px solid var(--vybe-line);
-}
-.command-call-dock {
-  border-top: 1px solid var(--vybe-line);
-}
-.command-call-dock::before {
-  content: none !important;
-}
-.command-call-stage main > div.rounded-2xl {
-  border-color: var(--vybe-line) !important;
-  background: rgba(255, 255, 255, 0.02) !important;
-}
-
+/* Generic hidden overrides */
 .modern-central-trigger,
 .vybe-command-trigger,
 .vybe-decisions-trigger,
 .vybe-direct-trigger {
   display: none !important;
 }
-.modern-collaboration-drawer,
-.vybe-direct-drawer,
-.vybe-decisions-drawer {
-  border-color: var(--vybe-line) !important;
-  background: rgba(20, 20, 23, 0.98) !important;
-  backdrop-filter: blur(24px);
-}
-.vybe-command-palette {
-  border-color: var(--vybe-line) !important;
-  background: #17171a !important;
-}
 .cyber-grid > .command-telemetry-rail,
 .cyber-grid .xl\:block {
   display: none !important;
-}
-
-@media (min-width: 768px) {
-  .vybe-shell {
-    height: 100vh;
-  }
-  .vybe-composer {
-    position: sticky;
-    bottom: 0;
-    z-index: 3;
-  }
-}
-
-@media (max-width: 767px) {
-  .vybe-sidebar {
-    width: min(88vw, 310px) !important;
-  }
-  .vybe-timeline-scroll {
-    padding: 8px 12px 4px !important;
-  }
-  .vybe-channel-intro {
-    padding: 10px 4px 14px !important;
-  }
-  .vybe-channel-intro h2 {
-    font-size: 19px !important;
-  }
-  .vybe-composer {
-    padding: 8px 12px 12px !important;
-  }
-  .vybe-message {
-    padding-inline: 5px !important;
-  }
-  .vybe-message-actions {
-    opacity: 1;
-  }
-  .vybe-utility-nav {
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
-  }
 }
