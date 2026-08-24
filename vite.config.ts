@@ -199,25 +199,6 @@ export default defineConfig(({ command }) => ({
     target: "safari13",
     rollupOptions: {
       ...(isCloudflareBuild ? { input: path.resolve(import.meta.dirname, "client", "cloudflare.html") } : {}),
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('mermaid') || id.includes('cytoscape') || id.includes('khroma') || id.includes('dagre')) {
-              return 'charts-vendor';
-            }
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-            if (id.includes('react/') || id.includes('react-dom/')) {
-              return 'react-vendor';
-            }
-            if (id.includes('@radix-ui') || id.includes('framer-motion')) {
-              return 'ui-vendor';
-            }
-            return 'vendor';
-          }
-        }
-      }
     },
   },
   server: {
