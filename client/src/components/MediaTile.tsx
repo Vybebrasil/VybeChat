@@ -42,7 +42,7 @@ export function MediaTile({
   const [canPip, setCanPip] = useState(false);
 
   useEffect(() => {
-    setCanPip(document.pictureInPictureEnabled);
+    setCanPip(typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && !!document.pictureInPictureEnabled);
   }, []);
 
   useEffect(() => {

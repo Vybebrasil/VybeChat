@@ -222,9 +222,10 @@ const AVATAR_COLORS = [
   "bg-amber-500/10 text-amber-300"
 ];
 
-function avatarColorClass(name: string) {
+function avatarColorClass(name?: string | null) {
+  const safeName = name || "Vybe";
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < safeName.length; i++) hash = safeName.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
