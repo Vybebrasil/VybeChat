@@ -33,6 +33,9 @@ import {
   type CallDeviceSelection,
 } from "@/lib/call-media";
 import { normalizeExternalMessage } from "@/lib/cloudflare-safe-message";
+import { CyberMarkdown } from "@/components/CyberMarkdown";
+import { playTick, playJoin, playLeave } from "@/lib/sound-design";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   EXTERNAL_WORKSPACE,
   findExternalChannel,
@@ -278,6 +281,11 @@ export default function CloudflareHome() {
   const [activeCallChannelId, setActiveCallChannelId] = useState<number | null>(
     null
   );
+  useEffect(() => {
+    if (activeCallChannelId) playJoin();
+    else playLeave();
+  }, [activeCallChannelId]);
+
   const [callEngine, setCallEngine] = useState<CallEngine | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<RemoteStream[]>([]);
@@ -1657,9 +1665,22 @@ export default function CloudflareHome() {
     setMobileSidebarOpen(false);
   };
 
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!e.dataTransfer) return;
+    const files = Array.from(e.dataTransfer.files);
+    const images = files.filter(f => f.type.startsWith("image/"));
+    if (images.length) {
+      const mockName = images[0].name.replace(/\s+/g, "_");
+      setDraft(prev => prev + (prev.trim() ? "\n" : "") + `![imagem_anexada](https://cdn.vybechat.dev/mock/${mockName})\n`);
+    }
+  };
+
   const sendMessage = (event: FormEvent) => {
     event.preventDefault();
     if (!draft.trim()) return;
+    playTick();
     socketRef.current.emit("message:new", {
       channelId: selectedChannelId,
       content: draft.trim(),
@@ -1669,12 +1690,14 @@ export default function CloudflareHome() {
     setThreadParent(null);
   };
 
-  const reactToMessage = (messageId: string, emoji: string) =>
+  const reactToMessage = (messageId: string, emoji: string) => {
+    playTick();
     socketRef.current.emit("message:reaction", {
       channelId: selectedChannelId,
       messageId,
       emoji,
     });
+  };
   const togglePin = (messageId: string) =>
     socketRef.current.emit("message:pin", {
       channelId: selectedChannelId,
@@ -2439,7 +2462,7 @@ export default function CloudflareHome() {
   );
 
   return (
-    <main className="vybe-app vybe-cyber-grid flex h-[100dvh] w-full text-slate-300 overflow-hidden">
+    <main onDragOver={e => e.preventDefault()} onDrop={handleDrop} className="vybe-app vybe-cyber-grid flex h-[100dvh] w-full text-slate-300 overflow-hidden">
       <CallPreflightDialog
         gateSensitivity={gateSensitivity}
         onGateSensitivityChange={setGateSensitivity}
@@ -2573,6 +2596,7 @@ export default function CloudflareHome() {
               <div className="vybe-channel-container mx-auto">
                 {channelMessages.length ? (
                   <div className="vybe-message-list">
+<AnimatePresence initial={false}>
                     {channelMessages.map((message, index) => (
                       <Fragment key={message.id}>
                         {needsDaySeparator(
@@ -2587,7 +2611,7 @@ export default function CloudflareHome() {
                             <span className="h-px flex-1 bg-white/10" />
                           </div>
                         )}
-                        <article className="vybe-message flex gap-3">
+                        <motion.article layout initial={{opacity:0, y:15}} animate={{opacity:1, y:0}} className="vybe-message flex gap-3">
                           <Avatar className="size-9 shrink-0">
                             <AvatarFallback className={`rounded-xl text-xs ${avatarColorClass(message.authorName)}`}>
                               {initials(message.authorName)}
@@ -2677,7 +2701,7 @@ export default function CloudflareHome() {
                                 </button>
                               </div>
                             )}
-                        </article>
+                        </motion.article>
                       </Fragment>
                     ))}
                   </div>
