@@ -65,7 +65,7 @@ export function MediaTile({
     } else {
       videoRef.current.srcObject = null;
     }
-  }, [stream, cameraOn, isVisible]);
+  }, [stream, cameraOn, sharingScreen, isVisible]);
 
   const togglePip = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -92,8 +92,8 @@ export function MediaTile({
       onClick={onSelect} 
       className={`relative group overflow-hidden rounded-2xl border bg-[#0b0a08] transition-all ${onSelect ? "cursor-pointer" : ""} ${selected ? "ring-2 ring-orange-300/75" : ""} ${speaking ? "border-emerald-300/90 shadow-[0_0_0_2px_rgba(52,211,153,.22),0_0_28px_rgba(52,211,153,.22)]" : accent ? "border-orange-400/80 shadow-[0_0_28px_rgba(255,126,18,.26)]" : "border-orange-200/15"} ${className}`}
     >
-      {stream && cameraOn ? (
-        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+      {stream && (cameraOn || sharingScreen) ? (
+        <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 h-full w-full ${sharingScreen ? "object-contain" : "object-cover"}`} />
       ) : (
         <div className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_center,rgba(255,125,22,.19),transparent_58%)]">
           <span className="grid size-16 place-items-center rounded-full border border-orange-300/30 bg-orange-400/10 text-xl font-bold text-orange-100">{label.slice(0, 1).toUpperCase()}</span>

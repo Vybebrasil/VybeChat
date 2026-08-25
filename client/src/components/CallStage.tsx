@@ -347,7 +347,7 @@ export function CallStage({
                   aria-label={
                     isFullscreen ? "Sair da tela cheia" : "Ver em tela cheia"
                   }
-                  className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-white/10"
+                  className="absolute left-3 top-12 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-white/10"
                 >
                   {isFullscreen ? (
                     <Shrink className="size-3.5" />
