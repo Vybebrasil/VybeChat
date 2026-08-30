@@ -379,8 +379,8 @@ export function MusicRoomPanel({
       const playerState = player.getPlayerState();
       const expected = getExpectedMusicPosition(shared);
       const isBufferingOrTransitioning =
-        playerState === window.YT?.PlayerState.BUFFERING ||
-        playerState === window.YT?.PlayerState.UNSTARTED ||
+        playerState === (window.YT?.PlayerState as any).BUFFERING ||
+        playerState === (window.YT?.PlayerState as any).UNSTARTED ||
         playerState === window.YT?.PlayerState.ENDED;
       const isPlaylistIndexSync =
         shared.queue[shared.queueIndex]?.kind !== "playlist" ||

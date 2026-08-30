@@ -24,6 +24,7 @@ type JoinOptions = {
   authToken: string;
   audioInputId?: string;
   videoInputId?: string;
+  audioConfig?: any;
   screenQuality: ScreenQuality;
 };
 

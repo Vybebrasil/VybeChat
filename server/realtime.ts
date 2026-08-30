@@ -81,6 +81,19 @@ export function attachRealtimeServer(httpServer: HttpServer) {
       io.to(roomName(channelId)).emit("message:new", { channelId });
     });
 
+    
+    socket.on("chat:reaction", ({ channelId, emoji }: { channelId?: number; emoji?: string }) => {
+      if (!channelId || !emoji) return;
+      const user = socketPresence.get(socket.id);
+      if (!user) return;
+      io.to(roomName(channelId)).emit("chat:reaction", {
+        channelId,
+        emoji: String(emoji).slice(0, 10),
+        userId: user.userId,
+        name: user.name
+      });
+    });
+
     socket.on("typing", ({ channelId, name, active }: { channelId?: number; name?: string; active?: boolean }) => {
       if (!channelId || !name) return;
       socket.to(roomName(channelId)).emit("typing", {

@@ -1,3 +1,4 @@
+import { motion, AnimatePresence } from "framer-motion";
 import { Bell, MessageCircleMore, SendHorizontal, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 
@@ -84,8 +85,14 @@ export function DirectMessagesDrawer({
           )}
         </button>
       )}
+      <AnimatePresence>
       {open && (
-        <section className="vybe-direct-drawer fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-orange-300/25 bg-[#0b0c10]/98 p-4 shadow-2xl backdrop-blur sm:p-5">
+        <motion.section 
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="vybe-direct-drawer fixed inset-y-0 right-0 z-[70] flex w-full max-w-md flex-col border-l border-orange-300/25 bg-[#0b0c10]/98 p-4 shadow-2xl backdrop-blur sm:p-5">
           <header className="flex items-center justify-between border-b border-orange-300/15 pb-4">
             <div>
               <p className="cyber-label">Mensagens diretas</p>
@@ -229,8 +236,8 @@ export function DirectMessagesDrawer({
               )}
             </section>
           </div>
-        </section>
-      )}
+        </motion.section>)}
+      </AnimatePresence>
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell,
   Pin,
@@ -115,8 +116,14 @@ export function CollaborationDrawer(props: Props) {
           Detalhes
         </button>
       )}
+      <AnimatePresence>
       {open && (
-        <section className="modern-collaboration-drawer fixed inset-y-0 right-0 z-[60] flex w-full max-w-md flex-col border-l border-orange-300/25 bg-[#0b0c10]/98 p-4 shadow-2xl backdrop-blur sm:p-5">
+        <motion.section 
+          initial={{ x: "100%" }}
+          animate={{ x: 0 }}
+          exit={{ x: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="modern-collaboration-drawer fixed inset-y-0 right-0 z-[60] flex w-full max-w-md flex-col border-l border-orange-300/25 bg-[#0b0c10]/98 p-4 shadow-2xl backdrop-blur sm:p-5">
           <header className="flex items-center justify-between border-b border-orange-300/15 pb-4">
             <div>
               <p className="cyber-label">Colaboração</p>
@@ -403,8 +410,8 @@ export function CollaborationDrawer(props: Props) {
               )}
             </section>
           </div>
-        </section>
-      )}
+        </motion.section>)}
+      </AnimatePresence>
     </>
   );
 }
