@@ -76,7 +76,7 @@ export function nextChannelId(workspace) {
   return proximo;
 }
 
-export async function loadWorkspace(storage) {
+export async function loadWorkspace(storage, isGaming) {
   const guardado = await storage.get(WORKSPACE_KEY);
-  return sanitizeWorkspace(guardado) ?? DEFAULT_WORKSPACE;
+  return sanitizeWorkspace(guardado) ?? (isGaming ? DEFAULT_GAMING_WORKSPACE : DEFAULT_WORKSPACE);
 }
