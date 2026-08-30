@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, useRef } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, Gamepad2, Shuffle } from "lucide-react";
+import { ChevronLeft, Gamepad2, Shuffle, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -11,24 +11,49 @@ export type GamingLoginProps = {
   onEntrar: (nome: string, avatar: string, codigo: string) => void;
 };
 
-// Gera um avatar pixelado adorável usando a API de dicebear
+// Gera um avatar pixelado usando a API de dicebear (9.x)
 const generateAvatar = (seed: string) => 
-  `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(seed)}`;
+  `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(seed)}`;
 
 export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: GamingLoginProps) {
   const [codigo, setCodigo] = useState(codigoInicial);
   const [nome, setNome] = useState("");
   const [avatarSeed, setAvatarSeed] = useState(() => Math.random().toString(36).substring(7));
+  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [erro, setErro] = useState("");
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mensagem = erro || erroExterno || "";
+  const currentAvatar = customAvatar || generateAvatar(avatarSeed);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setErro("A imagem deve ter no máximo 2MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCustomAvatar(reader.result as string);
+        setErro("");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRollAvatar = () => {
+    setCustomAvatar(null);
+    setAvatarSeed(Math.random().toString(36).substring(7));
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) return setErro("Digite seu Nickname.");
     if (!codigo.trim()) return setErro("Digite o código do servidor.");
     setErro("");
-    onEntrar(nome.trim(), generateAvatar(avatarSeed), codigo.trim());
+    onEntrar(nome.trim(), currentAvatar, codigo.trim());
   };
 
   return (
@@ -55,25 +80,45 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="flex flex-col items-center gap-3">
-            <div className="relative size-24 overflow-hidden rounded-xl bg-[#0b0c16] ring-1 ring-white/10">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative size-24 overflow-hidden rounded-xl bg-[#0b0c16] ring-2 ring-white/10 transition-all hover:ring-fuchsia-500/50">
               <img 
-                src={generateAvatar(avatarSeed)} 
+                src={currentAvatar} 
                 alt="Avatar Preview" 
                 className="size-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://api.dicebear.com/9.x/initials/svg?seed=${nome || 'Jogador'}`;
+                }}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
               />
             </div>
-            <button
-              type="button"
-              onClick={() => setAvatarSeed(Math.random().toString(36).substring(7))}
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-fuchsia-400 hover:bg-fuchsia-400/10"
-            >
-              <Shuffle className="size-3.5" />
-              Rolar Avatar
-            </button>
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                onClick={handleRollAvatar}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-stone-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Shuffle className="size-3.5" />
+                Rolar Aleatório
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-fuchsia-500/10 px-3 py-2 text-xs font-semibold text-fuchsia-400 transition-colors hover:bg-fuchsia-500/20"
+              >
+                <Upload className="size-3.5" />
+                Sua Foto
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 pt-2">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-stone-400">
                 Nickname
