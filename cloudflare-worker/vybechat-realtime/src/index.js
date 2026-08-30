@@ -367,6 +367,7 @@ export class VybeChatRoom {
   async fetch(request) {
     if (request) {
       const pathname = new URL(request.url).pathname;
+      this.isGaming = pathname.includes("gaming");
       if (pathname === "/roster") return this.handleRoster(request);
       if (pathname === "/calls/session") return this.handleCallSession(request);
     }
