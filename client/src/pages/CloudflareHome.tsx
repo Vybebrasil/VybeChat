@@ -443,9 +443,10 @@ export default function CloudflareHome() {
     // Contador no titulo da aba: com o VybeChat em segundo plano, e o unico
     // lugar onde a pessoa percebe que chegou mensagem.
     const total = totalUnread(unread);
+    const appName = appMode === "vybegaming" ? "VybeGaming" : "VybeChat";
     document.title =
-      total > 0 ? `(${total}) VybeChat` : "VybeChat — Central de comunicação";
-  }, [unread]);
+      total > 0 ? `(${total}) ${appName}` : `${appName} — Central de comunicação`;
+  }, [unread, appMode]);
   useEffect(() => {
     pushToTalkRef.current = pushToTalkEnabled;
   }, [pushToTalkEnabled]);
@@ -2368,7 +2369,7 @@ export default function CloudflareHome() {
             <div>
               <p className="cyber-label">{appMode === "vybegaming" ? "Servidor Gaming" : "Equipe Vybe"}</p>
               <h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-white">
-                VybeChat
+                {appMode === "vybegaming" ? "VybeGaming" : "VybeChat"}
               </h2>
             </div>
           </div>

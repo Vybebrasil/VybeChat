@@ -13,6 +13,11 @@ export const WORKSPACE_KEY = "workspace:channels";
 export const MAX_CHANNELS = 60;
 
 /** O que existia fixo no código, usado enquanto ninguém tiver alterado nada. */
+export const DEFAULT_GAMING_WORKSPACE = [
+  { name: "LOBBY", channels: [{ id: 1, name: "geral", type: "text" }] },
+  { name: "CANAIS DE VOZ", channels: [{ id: 2, name: "Sala Principal", type: "voice" }, { id: 3, name: "Game 1", type: "voice" }, { id: 4, name: "Game 2", type: "voice" }, { id: 5, name: "Game 3", type: "voice" }] },
+];
+
 export const DEFAULT_WORKSPACE = [
   { name: "OPERAÇÃO", channels: [{ id: 1, name: "geral", type: "text" }, { id: 2, name: "entregas", type: "text" }] },
   { name: "CRIAÇÃO", channels: [{ id: 3, name: "direção-de-arte", type: "text" }, { id: 4, name: "conteúdo", type: "text" }] },

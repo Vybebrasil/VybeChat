@@ -483,7 +483,7 @@ export class VybeChatRoom {
       );
     }
 
-    const workspace = await loadWorkspace(this.ctx.storage);
+    const workspace = await loadWorkspace(this.ctx.storage, this.isGaming);
     this.channelIds = collectChannelIds(workspace);
     const channelId = Number(body.channelId);
     const userId = String(body.userId ?? "").slice(0, 120);
@@ -836,7 +836,7 @@ export class VybeChatRoom {
       // O cliente precisa do proprio socketId para resolver colisao de ofertas
       // na chamada sem trocar mensagem extra entre os pares.
       this.channelIds = collectChannelIds(
-        await loadWorkspace(this.ctx.storage)
+        await loadWorkspace(this.ctx.storage, this.isGaming)
       );
       socket.send(json("session:ready", { socketId: state.socketId }));
       socket.send(json("voice:rooms", this.voiceRooms()));
@@ -1033,7 +1033,7 @@ export class VybeChatRoom {
     }
 
     if (type === "workspace:list") {
-      const workspace = await loadWorkspace(this.ctx.storage);
+      const workspace = await loadWorkspace(this.ctx.storage, this.isGaming);
       this.channelIds = collectChannelIds(workspace);
       socket.send(json("workspace:list", { workspace }));
       return;
