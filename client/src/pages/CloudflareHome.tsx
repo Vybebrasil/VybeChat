@@ -751,7 +751,7 @@ export default function CloudflareHome() {
         photo: profile.photo ?? "",
         status,
         statusMessage,
-        workspaceCode,
+        workspaceCode: appMode === "vybegaming" ? `${workspaceCode}-gaming` : workspaceCode,
       });
       socket.emit("channel:join", { channelId: selectedChannelIdRef.current });
       socket.emit("direct:list", {});
@@ -2366,7 +2366,7 @@ export default function CloudflareHome() {
               V
             </span>
             <div>
-              <p className="cyber-label">Equipe Vybe</p>
+              <p className="cyber-label">{appMode === "vybegaming" ? "Servidor Gaming" : "Equipe Vybe"}</p>
               <h2 className="mt-1 font-sans text-lg font-semibold tracking-tight text-white">
                 VybeChat
               </h2>
