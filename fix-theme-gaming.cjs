@@ -1,0 +1,5 @@
+const fs = require('fs');
+
+const css = ".theme-gaming {\n  --color-orange-50: var(--color-fuchsia-50);\n  --color-orange-100: var(--color-fuchsia-100);\n  --color-orange-200: var(--color-fuchsia-200);\n  --color-orange-300: var(--color-fuchsia-300);\n  --color-orange-400: var(--color-fuchsia-400);\n  --color-orange-500: var(--color-fuchsia-500);\n  --color-orange-600: var(--color-fuchsia-600);\n  --color-orange-700: var(--color-fuchsia-700);\n  --color-orange-800: var(--color-fuchsia-800);\n  --color-orange-900: var(--color-fuchsia-900);\n}";
+
+fs.writeFileSync('client/src/theme-gaming.css', css);
