@@ -51,7 +51,6 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) return setErro("Digite seu Nickname.");
-    if (!codigo.trim()) return setErro("Digite o código do servidor.");
     setErro("");
     onEntrar(nome.trim(), currentAvatar, codigo.trim());
   };
@@ -128,17 +127,6 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
                 value={nome}
                 onChange={e => setNome(e.target.value)}
                 placeholder="Seu nome no jogo"
-                className="h-12 border-white/10 bg-[#0b0c16] px-4 text-base placeholder:text-stone-600 focus-visible:ring-fuchsia-500/50"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-stone-400">
-                Código do Servidor
-              </label>
-              <Input
-                value={codigo}
-                onChange={e => setCodigo(e.target.value)}
-                placeholder="Ex: gaming-123"
                 className="h-12 border-white/10 bg-[#0b0c16] px-4 text-base placeholder:text-stone-600 focus-visible:ring-fuchsia-500/50"
               />
             </div>
