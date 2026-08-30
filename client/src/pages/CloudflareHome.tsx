@@ -1250,6 +1250,9 @@ export default function CloudflareHome() {
         // de deixar ela presa num shell vazio achando que o app quebrou.
         if (code === "auth") {
           if (isContextPreview) return;
+          // No modo gaming qualquer pessoa pode entrar: erros de auth são silenciados
+          // para não expulsar quem nao tem o codigo da equipe.
+          if (appMode === "vybegaming") return;
           // O cliente dispara channel:join, direct:list e decision:list logo apos o
           // presence:join. Quando o acesso e recusado, os quatro voltam com erro e o
           // generico sobrescrevia justamente a mensagem que explica o motivo. Vale a
