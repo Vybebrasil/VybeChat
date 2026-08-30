@@ -449,76 +449,82 @@ export function MusicRoomPanel({
     onControl(musicState.playing ? "pause" : "play", { positionSeconds });
   };
 
-  if (minimized) {
-    return (
-      <aside className="music-room-panel fixed bottom-3 right-3 z-[70] flex items-center gap-3 rounded-xl border border-orange-300/20 bg-[#131115]/98 px-4 py-2.5 text-white shadow-[0_24px_90px_rgba(0,0,0,.72)] backdrop-blur-xl w-[min(320px,calc(100vw-24px))] cursor-pointer hover:bg-[#131115]" onClick={() => setMinimized(false)}>
-        <span className="grid size-9 place-items-center rounded-lg bg-orange-400/12 text-orange-300 shrink-0">
-           <Music2 className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold">Tocando agora</p>
-          <p className="truncate text-[10px] text-stone-400">
-            {currentSource ? musicSourceLabel(currentSource) : "Música da sala"}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" onClick={togglePlayback} disabled={!canControl || !currentSource} className="grid size-8 place-items-center rounded-lg text-stone-200 hover:bg-white/10 disabled:opacity-30">
-            {musicState?.playing ? <Pause className="size-4"/> : <Play className="size-4 fill-current"/>}
-          </button>
-          <button type="button" onClick={(e) => { e.stopPropagation(); move(1); }} disabled={!canControl || !currentSource} className="grid size-8 place-items-center rounded-lg text-stone-200 hover:bg-white/10 disabled:opacity-30">
-            <ChevronRight className="size-4" />
-          </button>
-          <button type="button" onClick={(e) => { e.stopPropagation(); onClose(); }} className="grid size-8 place-items-center rounded-lg text-stone-400 hover:bg-rose-500/10 hover:text-rose-200">
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="absolute opacity-0 pointer-events-none w-1 h-1 overflow-hidden">
-          {joined && <div ref={hostRef} className="w-full h-full" />}
-        </div>
-      </aside>
-    );
-  }
 
   return (
     <aside
-      className="music-room-panel fixed bottom-3 right-3 top-3 z-[70] flex w-[min(460px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-orange-300/20 bg-[#131115]/98 text-white shadow-[0_24px_90px_rgba(0,0,0,.72)] backdrop-blur-xl"
+      className={
+        minimized
+          ? "music-room-panel fixed bottom-3 right-3 z-[70] flex items-center gap-3 rounded-xl border border-orange-300/20 bg-[#131115]/98 px-4 py-2.5 text-white shadow-[0_24px_90px_rgba(0,0,0,.72)] backdrop-blur-xl w-[min(320px,calc(100vw-24px))] cursor-pointer hover:bg-[#131115]"
+          : "music-room-panel fixed bottom-3 right-3 top-3 z-[70] flex w-[min(460px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-orange-300/20 bg-[#131115]/98 text-white shadow-[0_24px_90px_rgba(0,0,0,.72)] backdrop-blur-xl"
+      }
       aria-label="Música da sala"
+      onClick={() => minimized && setMinimized(false)}
     >
-      <header className="flex shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3.5">
-        <span className="grid size-9 place-items-center rounded-xl bg-orange-400/12 text-orange-300">
-          <Music2 className="size-4" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Música da sala</p>
-          <p className="truncate text-[11px] text-stone-400">{roomName}</p>
-        </div>
-        {musicState?.playing && (
-          <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
-            <Radio className="size-3" /> ao vivo
+      {/* MINIMIZED VIEW CONTENT */}
+      {minimized && (
+        <>
+          <span className="grid size-9 place-items-center rounded-lg bg-orange-400/12 text-orange-300 shrink-0">
+             <Music2 className="size-4" />
           </span>
-        )}
-        <button
-          type="button"
-          onClick={() => setMinimized(true)}
-          className="grid size-8 place-items-center rounded-lg text-stone-400 hover:bg-white/8 hover:text-white"
-          aria-label="Minimizar música"
-        >
-          <Minus className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="grid size-8 place-items-center rounded-lg text-stone-400 hover:bg-white/8 hover:text-white"
-          aria-label="Fechar música"
-        >
-          <X className="size-4" />
-        </button>
-      </header>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold">Tocando agora</p>
+            <p className="truncate text-[10px] text-stone-400">
+              {currentSource ? musicSourceLabel(currentSource) : "Música da sala"}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button type="button" onClick={togglePlayback} disabled={!canControl || !currentSource} className="grid size-8 place-items-center rounded-lg text-stone-200 hover:bg-white/10 disabled:opacity-30">
+              {musicState?.playing ? <Pause className="size-4"/> : <Play className="size-4 fill-current"/>}
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); move(1); }} disabled={!canControl || !currentSource} className="grid size-8 place-items-center rounded-lg text-stone-200 hover:bg-white/10 disabled:opacity-30">
+              <ChevronRight className="size-4" />
+            </button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onClose(); }} className="grid size-8 place-items-center rounded-lg text-stone-400 hover:bg-rose-500/10 hover:text-rose-200">
+              <X className="size-4" />
+            </button>
+          </div>
+        </>
+      )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
+      {/* EXPANDED VIEW CONTENT */}
+      {!minimized && (
+        <header className="flex shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3.5 cursor-default" onClick={e => e.stopPropagation()}>
+          <span className="grid size-9 place-items-center rounded-xl bg-orange-400/12 text-orange-300">
+            <Music2 className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Música da sala</p>
+            <p className="truncate text-[11px] text-stone-400">{roomName}</p>
+          </div>
+          {musicState?.playing && (
+            <span className="flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
+              <Radio className="size-3" /> ao vivo
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setMinimized(true)}
+            className="grid size-8 place-items-center rounded-lg text-stone-400 hover:bg-white/8 hover:text-white"
+            aria-label="Minimizar música"
+          >
+            <Minus className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid size-8 place-items-center rounded-lg text-stone-400 hover:bg-white/8 hover:text-white"
+            aria-label="Fechar música"
+          >
+            <X className="size-4" />
+          </button>
+        </header>
+      )}
+
+      {/* STABLE HOSTREF */}
+      <div className={minimized ? "absolute opacity-0 pointer-events-none w-1 h-1 overflow-hidden" : "min-h-0 flex-1 overflow-y-auto p-4 cursor-default"} onClick={e => e.stopPropagation()}>
+        <div className={minimized ? "w-full h-full" : "overflow-hidden rounded-xl border border-white/10 bg-black"}>
           {joined ? (
-            <div ref={hostRef} className="min-h-[200px] w-full aspect-video" />
+            <div ref={hostRef} className={minimized ? "w-full h-full" : "min-h-[200px] w-full aspect-video"} />
           ) : (
             <div className="flex min-h-[220px] flex-col items-center justify-center px-7 text-center">
               <span className="grid size-12 place-items-center rounded-2xl bg-orange-400/12 text-orange-300">
@@ -526,8 +532,7 @@ export function MusicRoomPanel({
               </span>
               <p className="mt-4 text-sm font-semibold">Entrar na música</p>
               <p className="mt-1.5 max-w-xs text-[11px] leading-5 text-stone-400">
-                O player fica visível e o volume é só seu. Clique para liberar o
-                áudio no navegador.
+                O player fica visível e o volume é só seu. Clique para liberar o áudio no navegador.
               </p>
               <button
                 type="button"
@@ -540,207 +545,211 @@ export function MusicRoomPanel({
           )}
         </div>
 
-        {playerError && (
+        {!minimized && playerError && (
           <p className="mt-2 rounded-lg bg-rose-500/12 px-3 py-2 text-[11px] leading-4 text-rose-100">
             {playerError}
           </p>
         )}
 
-        <section className="mt-3 rounded-xl border border-white/8 bg-white/[.03] p-3">
-          <div className="flex items-start gap-3">
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange-400/10 text-orange-300">
-              <ListMusic className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">
-                {currentSource
-                  ? musicSourceLabel(currentSource)
-                  : "Nada tocando agora"}
-              </p>
-              <p className="mt-1 text-[10px] text-stone-500">
-                {musicState?.djName
-                  ? `DJ: ${musicState.djName}`
-                  : "A primeira pessoa que adicionar vira DJ"}
-              </p>
-            </div>
-            {!canControl && (
-              <button
-                type="button"
-                onClick={onClaimDj}
-                className="rounded-lg border border-orange-300/25 px-2.5 py-1.5 text-[10px] font-semibold text-orange-100 hover:bg-orange-400/10"
-              >
-                Assumir DJ
-              </button>
-            )}
-          </div>
-
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => move(-1)}
-              disabled={!canControl || !currentSource}
-              className="grid size-9 place-items-center rounded-lg bg-white/6 text-stone-200 disabled:opacity-30"
-              aria-label="Faixa anterior"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={togglePlayback}
-              disabled={!canControl || !currentSource}
-              className="grid size-11 place-items-center rounded-xl bg-orange-500 text-black disabled:opacity-30"
-              aria-label={
-                musicState?.playing ? "Pausar música" : "Tocar música"
-              }
-            >
-              {musicState?.playing ? (
-                <Pause className="size-5" />
-              ) : (
-                <Play className="size-5 fill-current" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => move(1)}
-              disabled={!canControl || !currentSource}
-              className="grid size-9 place-items-center rounded-lg bg-white/6 text-stone-200 disabled:opacity-30"
-              aria-label="Próxima faixa"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-
-          <div className="mt-3 flex items-center gap-2 text-[10px] text-stone-500">
-            <span className="w-9 text-right">
-              {formatMusicTime(currentTime)}
-            </span>
-            <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/8">
-              <div
-                className="h-full rounded-full bg-orange-400"
-                style={{
-                  width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%`,
-                }}
-              />
-            </div>
-            <span className="w-9">{formatMusicTime(duration)}</span>
-          </div>
-          <label className="mt-3 flex items-center gap-2 text-[10px] text-stone-400">
-            <Volume2 className="size-3.5" />
-            <span>Seu volume</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={volume}
-              onChange={event => {
-                const next = Number(event.target.value);
-                setVolume(next);
-                playerRef.current?.setVolume(next);
-              }}
-              className="min-w-0 flex-1 accent-orange-400"
-              aria-label="Volume da música"
-            />
-            <span className="w-7 text-right">{volume}%</span>
-          </label>
-        </section>
-
-        <form
-          onSubmit={submit}
-          className="mt-3 rounded-xl border border-white/8 bg-white/[.03] p-3"
-        >
-          <label
-            htmlFor="music-source"
-            className="text-[11px] font-semibold text-stone-200"
-          >
-            Adicionar vídeo ou playlist
-          </label>
-          <div className="mt-2 flex gap-2">
-            <input
-              id="music-source"
-              value={input}
-              onChange={event => {
-                setInput(event.target.value);
-                setInputError("");
-              }}
-              placeholder="Cole o link do YouTube"
-              className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white outline-none placeholder:text-stone-600 focus:border-orange-300/40"
-            />
-            <button
-              type="submit"
-              className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange-500 text-black"
-              aria-label="Adicionar à fila"
-            >
-              <Plus className="size-4" />
-            </button>
-          </div>
-          {inputError && (
-            <p className="mt-2 text-[10px] text-rose-200">{inputError}</p>
-          )}
-        </form>
-
-        <section className="mt-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-stone-200">
-              Fila compartilhada · {musicState?.queue.length ?? 0}
-            </p>
-            {canControl && Boolean(musicState?.queue.length) && (
-              <button
-                type="button"
-                onClick={() => onControl("clear")}
-                className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-rose-200"
-              >
-                <RotateCcw className="size-3" /> Limpar
-              </button>
-            )}
-          </div>
-          <div className="mt-2 space-y-1.5">
-            {musicState?.queue.map((source, index) => (
-              <div
-                key={source.id}
-                className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${index === musicState.queueIndex ? "border-orange-300/25 bg-orange-400/8" : "border-white/6 bg-white/[.02]"}`}
-              >
-                <span className="grid size-7 shrink-0 place-items-center rounded-md bg-black/25 text-[10px] font-bold text-stone-400">
-                  {index + 1}
+        {!minimized && (
+          <>
+            <section className="mt-3 rounded-xl border border-white/8 bg-white/[.03] p-3">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange-400/10 text-orange-300">
+                  <ListMusic className="size-4" />
                 </span>
-                <button
-                  type="button"
-                  disabled={!canControl}
-                  onClick={() =>
-                    onControl("select", {
-                      queueIndex: index,
-                      playlistIndex: 0,
-                      positionSeconds: 0,
-                      playing: true,
-                    })
-                  }
-                  className="min-w-0 flex-1 text-left disabled:cursor-default"
-                >
-                  <span className="block truncate text-[11px] font-semibold text-stone-200">
-                    {queueSummary[index]}
-                  </span>
-                  <span className="block truncate text-[10px] text-stone-500">
-                    adicionado por {source.addedBy.name}
-                  </span>
-                </button>
-                {canControl && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-white">
+                    {currentSource
+                      ? musicSourceLabel(currentSource)
+                      : "Nada tocando agora"}
+                  </p>
+                  <p className="mt-1 text-[10px] text-stone-500">
+                    {musicState?.djName
+                      ? `DJ: ${musicState.djName}`
+                      : "A primeira pessoa que adicionar vira DJ"}
+                  </p>
+                </div>
+                {!canControl && (
                   <button
                     type="button"
-                    onClick={() => onControl("remove", { queueIndex: index })}
-                    className="grid size-7 place-items-center rounded-md text-stone-600 hover:bg-rose-500/10 hover:text-rose-200"
-                    aria-label={`Remover item ${index + 1}`}
+                    onClick={onClaimDj}
+                    className="rounded-lg border border-orange-300/25 px-2.5 py-1.5 text-[10px] font-semibold text-orange-100 hover:bg-orange-400/10"
                   >
-                    <Trash2 className="size-3.5" />
+                    Assumir DJ
                   </button>
                 )}
               </div>
-            ))}
-            {!musicState?.queue.length && (
-              <p className="rounded-lg border border-dashed border-white/8 px-3 py-5 text-center text-[10px] text-stone-500">
-                Cole uma playlist do YouTube para começar.
-              </p>
-            )}
-          </div>
-        </section>
+    
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => move(-1)}
+                  disabled={!canControl || !currentSource}
+                  className="grid size-9 place-items-center rounded-lg bg-white/6 text-stone-200 disabled:opacity-30"
+                  aria-label="Faixa anterior"
+                >
+                  <ChevronLeft className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePlayback}
+                  disabled={!canControl || !currentSource}
+                  className="grid size-11 place-items-center rounded-xl bg-orange-500 text-black disabled:opacity-30"
+                  aria-label={
+                    musicState?.playing ? "Pausar música" : "Tocar música"
+                  }
+                >
+                  {musicState?.playing ? (
+                    <Pause className="size-5" />
+                  ) : (
+                    <Play className="size-5 fill-current" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => move(1)}
+                  disabled={!canControl || !currentSource}
+                  className="grid size-9 place-items-center rounded-lg bg-white/6 text-stone-200 disabled:opacity-30"
+                  aria-label="Próxima faixa"
+                >
+                  <ChevronRight className="size-4" />
+                </button>
+              </div>
+    
+              <div className="mt-3 flex items-center gap-2 text-[10px] text-stone-500">
+                <span className="w-9 text-right">
+                  {formatMusicTime(currentTime)}
+                </span>
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/8">
+                  <div
+                    className="h-full rounded-full bg-orange-400"
+                    style={{
+                      width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+                <span className="w-9">{formatMusicTime(duration)}</span>
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-[10px] text-stone-400">
+                <Volume2 className="size-3.5" />
+                <span>Seu volume</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={event => {
+                    const next = Number(event.target.value);
+                    setVolume(next);
+                    playerRef.current?.setVolume(next);
+                  }}
+                  className="min-w-0 flex-1 accent-orange-400"
+                  aria-label="Volume da música"
+                />
+                <span className="w-7 text-right">{volume}%</span>
+              </label>
+            </section>
+    
+            <form
+              onSubmit={submit}
+              className="mt-3 rounded-xl border border-white/8 bg-white/[.03] p-3"
+            >
+              <label
+                htmlFor="music-source"
+                className="text-[11px] font-semibold text-stone-200"
+              >
+                Adicionar vídeo ou playlist
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="music-source"
+                  value={input}
+                  onChange={event => {
+                    setInput(event.target.value);
+                    setInputError("");
+                  }}
+                  placeholder="Cole o link do YouTube"
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white outline-none placeholder:text-stone-600 focus:border-orange-300/40"
+                />
+                <button
+                  type="submit"
+                  className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange-500 text-black"
+                  aria-label="Adicionar à fila"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+              {inputError && (
+                <p className="mt-2 text-[10px] text-rose-200">{inputError}</p>
+              )}
+            </form>
+    
+            <section className="mt-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold text-stone-200">
+                  Fila compartilhada · {musicState?.queue.length ?? 0}
+                </p>
+                {canControl && Boolean(musicState?.queue.length) && (
+                  <button
+                    type="button"
+                    onClick={() => onControl("clear")}
+                    className="flex items-center gap-1 text-[10px] text-stone-500 hover:text-rose-200"
+                  >
+                    <RotateCcw className="size-3" /> Limpar
+                  </button>
+                )}
+              </div>
+              <div className="mt-2 space-y-1.5">
+                {musicState?.queue.map((source, index) => (
+                  <div
+                    key={source.id}
+                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 ${index === musicState.queueIndex ? "border-orange-300/25 bg-orange-400/8" : "border-white/6 bg-white/[.02]"}`}
+                  >
+                    <span className="grid size-7 shrink-0 place-items-center rounded-md bg-black/25 text-[10px] font-bold text-stone-400">
+                      {index + 1}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={!canControl}
+                      onClick={() =>
+                        onControl("select", {
+                          queueIndex: index,
+                          playlistIndex: 0,
+                          positionSeconds: 0,
+                          playing: true,
+                        })
+                      }
+                      className="min-w-0 flex-1 text-left disabled:cursor-default"
+                    >
+                      <span className="block truncate text-[11px] font-semibold text-stone-200">
+                        {queueSummary[index]}
+                      </span>
+                      <span className="block truncate text-[10px] text-stone-500">
+                        adicionado por {source.addedBy.name}
+                      </span>
+                    </button>
+                    {canControl && (
+                      <button
+                        type="button"
+                        onClick={() => onControl("remove", { queueIndex: index })}
+                        className="grid size-7 place-items-center rounded-md text-stone-600 hover:bg-rose-500/10 hover:text-rose-200"
+                        aria-label={`Remover item ${index + 1}`}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {!musicState?.queue.length && (
+                  <p className="rounded-lg border border-dashed border-white/8 px-3 py-5 text-center text-[10px] text-stone-500">
+                    Cole uma playlist do YouTube para começar.
+                  </p>
+                )}
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </aside>
   );
