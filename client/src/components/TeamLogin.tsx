@@ -1,5 +1,5 @@
 import React, { useMemo, useState, type FormEvent } from "react";
-import { Loader2, Search, Users } from "lucide-react";
+import { ChevronLeft, Loader2, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchTeamRoster, filtrarEquipe, iniciais, primeiroNome, type TeamMember } from "@/lib/team-roster";
@@ -12,11 +12,12 @@ export type TeamLoginProps = {
   onEntrar: (pessoa: TeamMember, workspaceCode: string) => void;
   /** Usado quando o Monday está fora do ar e não há lista para escolher. */
   onEntrarPorNome: (nome: string, workspaceCode: string) => void;
+  onBack?: () => void;
 };
 
 type Etapa = "codigo" | "quem";
 
-export function TeamLogin({ workerUrl, codigoInicial, erroExterno, onEntrar, onEntrarPorNome }: TeamLoginProps) {
+export function TeamLogin({ workerUrl, codigoInicial, erroExterno, onEntrar, onEntrarPorNome, onBack }: TeamLoginProps) {
   const [etapa, setEtapa] = useState<Etapa>("codigo");
   const [codigo, setCodigo] = useState(codigoInicial);
   const [equipe, setEquipe] = useState<TeamMember[]>([]);
@@ -49,6 +50,15 @@ export function TeamLogin({ workerUrl, codigoInicial, erroExterno, onEntrar, onE
 
   return (
     <main className="cyber-grid grid min-h-screen place-items-center overflow-hidden p-5">
+      {onBack && (
+        <button 
+          onClick={onBack}
+          className="absolute left-6 top-6 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-400 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <ChevronLeft className="size-4" />
+          Voltar
+        </button>
+      )}
       <div className="cyber-panel cyber-corner cyber-reveal w-full max-w-md p-1">
         <div className="border border-orange-300/15 bg-[#0c0d10]/80 p-7 sm:p-9">
           <div className="flex items-center justify-between">

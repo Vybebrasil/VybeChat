@@ -2332,6 +2332,10 @@ export default function CloudflareHome() {
         erroExterno={authError}
         onEntrar={entrarComoMembro}
         onEntrarPorNome={entrarPorNome}
+        onBack={() => {
+          setAppMode(null);
+          localStorage.removeItem("vybe_app_mode");
+        }}
       />
     );
   }
