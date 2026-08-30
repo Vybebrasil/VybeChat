@@ -2299,9 +2299,12 @@ export default function CloudflareHome() {
       return (
         <ModeSelection
           onSelect={mode => {
-            setAppMode(mode);
-            localStorage.setItem("vybe_app_mode", mode);
-          }}
+              localStorage.setItem("vybe_app_mode", mode);
+              // Recarrega a pagina para garantir que o socket nasce ja apontando
+              // para a sala correta (vybe-gaming ou vybe-os). Sem o reload, o
+              // useRef e inicializado antes da selecao e fica na sala errada.
+              window.location.reload();
+            }}
         />
       );
     }
