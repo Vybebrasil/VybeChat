@@ -13,6 +13,7 @@ type SessionRequest = {
   channelId: number;
   roomName: string;
   workspaceCode: string;
+  room?: string;
   user: { id: string; name: string; photo?: string };
   fetcher?: typeof fetch;
 };
@@ -40,6 +41,7 @@ export async function requestRealtimeKitSession({
   workerUrl,
   channelId,
   roomName,
+  room,
   workspaceCode,
   user,
   fetcher = fetch,
@@ -49,6 +51,7 @@ export async function requestRealtimeKitSession({
   const endpoint = new URL(workerUrl);
   endpoint.pathname = "/calls/session";
   endpoint.search = "";
+  if (room) endpoint.searchParams.set("room", room);
   endpoint.hash = "";
 
   let response: Response;

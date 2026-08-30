@@ -314,7 +314,7 @@ export default {
           origin
         );
       const response =
-        await env.VYBECHAT_ROOM.getByName("vybe-os").fetch(request);
+        await env.VYBECHAT_ROOM.getByName(url.searchParams.get("room") || "vybe-os").fetch(request);
       return withCors(response, origin);
     }
     if (url.pathname === "/roster") {
@@ -338,7 +338,7 @@ export default {
           origin
         );
       const response =
-        await env.VYBECHAT_ROOM.getByName("vybe-os").fetch(request);
+        await env.VYBECHAT_ROOM.getByName(url.searchParams.get("room") || "vybe-os").fetch(request);
       return withCors(response, origin);
     }
     const match = url.pathname.match(/^\/room\/([a-z0-9-]{1,80})$/i);
@@ -366,8 +366,9 @@ export class VybeChatRoom {
 
   async fetch(request) {
     if (request) {
-      const pathname = new URL(request.url).pathname;
-      this.isGaming = pathname.includes("gaming");
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+      this.isGaming = pathname.includes("gaming") || (url.searchParams.get("room") || "").includes("gaming");
       if (pathname === "/roster") return this.handleRoster(request);
       if (pathname === "/calls/session") return this.handleCallSession(request);
     }
@@ -403,8 +404,8 @@ export class VybeChatRoom {
       return Response.json({ error: "Requisicao invalida." }, { status: 400 });
     }
     if (
-      !expected ||
-      !(timingSafeEqual(String(body.workspaceCode ?? ""), expected) || timingSafeEqual(String(body.workspaceCode ?? ""), expected + "-gaming"))
+      !this.isGaming && (!expected ||
+      !(timingSafeEqual(String(body.workspaceCode ?? ""), expected) || timingSafeEqual(String(body.workspaceCode ?? ""), expected + "-gaming")))
     ) {
       return Response.json(
         { error: "O código de acesso da equipe não foi aceito.", code: "auth" },
@@ -475,8 +476,8 @@ export class VybeChatRoom {
 
     const expected = this.env?.VYBECHAT_WORKSPACE_CODE;
     if (
-      !expected ||
-      !(timingSafeEqual(String(body.workspaceCode ?? ""), expected) || timingSafeEqual(String(body.workspaceCode ?? ""), expected + "-gaming"))
+      !this.isGaming && (!expected ||
+      !(timingSafeEqual(String(body.workspaceCode ?? ""), expected) || timingSafeEqual(String(body.workspaceCode ?? ""), expected + "-gaming")))
     ) {
       return Response.json(
         { error: "O código de acesso da equipe não foi aceito.", code: "auth" },
@@ -805,6 +806,7 @@ export class VybeChatRoom {
         return;
       }
       if (
+        !this.isGaming &&
         !(timingSafeEqual(String(payload.workspaceCode ?? ""), workspaceCode) || timingSafeEqual(String(payload.workspaceCode ?? ""), workspaceCode + "-gaming"))
       ) {
         socket.send(
