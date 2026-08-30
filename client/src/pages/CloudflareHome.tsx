@@ -75,6 +75,8 @@ import {
 } from "@/lib/peer-negotiation";
 import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
+import { ModeSelection, type AppMode } from "@/components/ModeSelection";
+import { GamingLogin } from "@/components/GamingLogin";
 import { toProfileId, type TeamMember } from "@/lib/team-roster";
 import {
   bumpUnread,
@@ -259,7 +261,12 @@ function loadProfile(): Profile | null {
   }
 }
 
+
 export default function CloudflareHome() {
+  const [appMode, setAppMode] = useState<AppMode | null>(() => {
+    return (localStorage.getItem("vybe_app_mode") as AppMode) || null;
+  });
+
   const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
   const {
     preferences: notificationPreferences,
@@ -2284,6 +2291,40 @@ export default function CloudflareHome() {
   };
 
   if (!profile) {
+    if (!appMode) {
+      return (
+        <ModeSelection
+          onSelect={mode => {
+            setAppMode(mode);
+            localStorage.setItem("vybe_app_mode", mode);
+          }}
+        />
+      );
+    }
+    
+    if (appMode === "vybegaming") {
+      return (
+        <GamingLogin
+          codigoInicial={workspaceCode}
+          erroExterno={authError}
+          onBack={() => {
+            setAppMode(null);
+            localStorage.removeItem("vybe_app_mode");
+          }}
+          onEntrar={(nome, avatar, codigo) => {
+            guardarPerfil(
+              {
+                id: crypto.randomUUID(),
+                name: nome,
+                photo: avatar,
+              },
+              codigo
+            );
+          }}
+        />
+      );
+    }
+
     return (
       <TeamLogin
         workerUrl={String(import.meta.env.VITE_REALTIME_WORKER_URL ?? "")}
@@ -2462,7 +2503,7 @@ export default function CloudflareHome() {
   );
 
   return (
-    <main onDragOver={e => e.preventDefault()} onDrop={handleDrop} className="vybe-app vybe-cyber-grid flex h-[100dvh] w-full text-slate-300 overflow-hidden">
+    <main onDragOver={e => e.preventDefault()} onDrop={handleDrop} className={`vybe-app vybe-cyber-grid flex h-[100dvh] w-full text-slate-300 overflow-hidden ${appMode === "vybegaming" ? "theme-gaming" : ""}`}>
       <CallPreflightDialog
         gateSensitivity={gateSensitivity}
         onGateSensitivityChange={setGateSensitivity}
@@ -2535,7 +2576,7 @@ export default function CloudflareHome() {
                 {selectedChannel?.name}
               </h1>
               <p className="hidden truncate text-[11px] text-stone-500 sm:block">
-                Conversa e contexto da equipe
+                {appMode === "vybegaming" ? "Lobby do servidor" : "Conversa e contexto da equipe"}
               </p>
             </div>
             <div className="vybe-channel-actions ml-auto flex items-center gap-2">
@@ -2714,7 +2755,7 @@ export default function CloudflareHome() {
                       Bem-vindo a <span className="text-orange-400">#{selectedChannel?.name}</span>
                     </h2>
                     <p className="mt-3 max-w-md text-sm leading-relaxed text-stone-400">
-                      Este é o início do canal. Envie a primeira mensagem para a equipe, compartilhe atualizações ou inicie uma chamada de voz para alinhar os próximos passos.
+                      {appMode === "vybegaming" ? "Este é o início do lobby. Mande um salve pra galera ou abra call pra jogar." : "Este é o início do canal. Envie a primeira mensagem para a equipe, compartilhe atualizações ou inicie uma chamada de voz para alinhar os próximos passos."}
                     </p>
                     <div className="mt-8">
                       <button
