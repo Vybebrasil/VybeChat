@@ -11,6 +11,11 @@ class WorkerRealtimeSocket {
   private reconnectAttempt = 0;
   private lastMessageAt = 0;
   private shouldReconnect = false;
+  private room: string;
+
+  constructor(room = "vybe-os") {
+    this.room = room;
+  }
 
   on(event: string, handler: RealtimeEventHandler) {
     const handlers = this.handlers.get(event) ?? new Set();
@@ -43,7 +48,7 @@ class WorkerRealtimeSocket {
       return this;
     }
 
-    this.socket = new WebSocket(toWorkerWebSocketUrl(workerUrl));
+    this.socket = new WebSocket(toWorkerWebSocketUrl(workerUrl, this.room));
     this.socket.addEventListener("open", () => {
       this.connected = true;
       this.reconnectAttempt = 0;
@@ -125,10 +130,13 @@ export function reconnectDelay(attempt: number, random = Math.random()) {
 }
 
 let socket: WorkerRealtimeSocket | null = null;
+let currentRoom: string | null = null;
 
-export function getRealtimeSocket() {
-  if (!socket) {
-    socket = new WorkerRealtimeSocket();
+export function getRealtimeSocket(room = "vybe-os") {
+  if (!socket || currentRoom !== room) {
+    if (socket) socket.disconnect();
+    socket = new WorkerRealtimeSocket(room);
+    currentRoom = room;
   }
   return socket;
 }

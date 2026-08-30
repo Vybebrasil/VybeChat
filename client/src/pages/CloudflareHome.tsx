@@ -392,7 +392,7 @@ export default function CloudflareHome() {
   const [handRaised, setHandRaised] = useState(false);
   const [decisions, setDecisions] = useState<TeamDecision[]>([]);
   const realtimeKit = useRealtimeKitCall();
-  const socketRef = useRef(getRealtimeSocket());
+  const socketRef = useRef(getRealtimeSocket(appMode === "vybegaming" ? "vybe-gaming" : "vybe-os"));
   const localStreamRef = useRef<MediaStream | null>(null);
   const activeCallRef = useRef<number | null>(null);
   const callEngineRef = useRef<CallEngine | null>(null);
