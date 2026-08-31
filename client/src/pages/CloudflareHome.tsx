@@ -744,7 +744,9 @@ export default function CloudflareHome() {
 
   useEffect(() => {
     if (!profile) return;
-    const socket = socketRef.current;
+    const room = appMode === "vybegaming" ? "vybe-gaming" : "vybe-os";
+    const socket = getRealtimeSocket(room);
+    socketRef.current = socket;
     const announce = () => {
       socket.emit("presence:join", {
         userId: profile.id,
@@ -752,7 +754,7 @@ export default function CloudflareHome() {
         photo: profile.photo ?? "",
         status,
         statusMessage,
-        workspaceCode: appMode === "vybegaming" ? `${workspaceCode}-gaming` : workspaceCode,
+        workspaceCode: appMode === "vybegaming" ? (workspaceCode ? `${workspaceCode}-gaming` : "gaming") : workspaceCode,
       });
       socket.emit("channel:join", { channelId: selectedChannelIdRef.current });
       socket.emit("direct:list", {});
@@ -1307,11 +1309,13 @@ export default function CloudflareHome() {
     };
   }, [
     activeDirectThreadId,
+    appMode,
     isContextPreview,
     notify,
     profile,
     status,
     statusMessage,
+    workspaceCode,
   ]);
 
   useEffect(() => {
@@ -2299,12 +2303,10 @@ export default function CloudflareHome() {
       return (
         <ModeSelection
           onSelect={mode => {
-              localStorage.setItem("vybe_app_mode", mode);
-              // Recarrega a pagina para garantir que o socket nasce ja apontando
-              // para a sala correta (vybe-gaming ou vybe-os). Sem o reload, o
-              // useRef e inicializado antes da selecao e fica na sala errada.
-              window.location.reload();
-            }}
+            setAuthError("");
+            setAppMode(mode);
+            localStorage.setItem("vybe_app_mode", mode);
+          }}
         />
       );
     }
@@ -2315,6 +2317,7 @@ export default function CloudflareHome() {
           codigoInicial={workspaceCode}
           erroExterno={authError}
           onBack={() => {
+            setAuthError("");
             setAppMode(null);
             localStorage.removeItem("vybe_app_mode");
           }}
@@ -2340,6 +2343,7 @@ export default function CloudflareHome() {
         onEntrar={entrarComoMembro}
         onEntrarPorNome={entrarPorNome}
         onBack={() => {
+          setAuthError("");
           setAppMode(null);
           localStorage.removeItem("vybe_app_mode");
         }}

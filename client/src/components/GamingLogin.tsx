@@ -11,7 +11,6 @@ export type GamingLoginProps = {
   onEntrar: (nome: string, avatar: string, codigo: string) => void;
 };
 
-// Gera um avatar pixelado usando a API de dicebear (9.x)
 const generateAvatar = (seed: string) =>
   `https://api.dicebear.com/9.x/pixel-art/svg?seed=${encodeURIComponent(seed)}`;
 
@@ -21,22 +20,26 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
   const [avatarSeed, setAvatarSeed] = useState(() => Math.random().toString(36).substring(7));
   const [customAvatar, setCustomAvatar] = useState<string | null>(null);
   const [erro, setErro] = useState("");
+  // Só mostra erros externos (auth) depois que o usuário tentou entrar ao menos uma vez.
+  // Isso evita que erros de sessões anteriores apareçam antes de qualquer ação.
+  const [tentou, setTentou] = useState(false);
   const [mostrarCodigo, setMostrarCodigo] = useState(Boolean(codigoInicial));
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const codigoRef = useRef<HTMLInputElement>(null);
-
-  const isAuthError = erroExterno?.toLowerCase().includes("código") || erroExterno?.toLowerCase().includes("codigo");
-  const mensagem = erro || erroExterno || "";
   const currentAvatar = customAvatar || generateAvatar(avatarSeed);
 
-  // Quando chega um erro de auth, exibe automaticamente o campo de código
+  const erroParaMostrar = erro || (tentou ? erroExterno : "") || "";
+  const isAuthError = erroParaMostrar?.toLowerCase().includes("código") ||
+                      erroParaMostrar?.toLowerCase().includes("codigo");
+
+  // Quando chega erro de auth após tentativa, garante que o campo de código aparece
   useEffect(() => {
-    if (isAuthError) {
+    if (tentou && isAuthError) {
       setMostrarCodigo(true);
       setTimeout(() => codigoRef.current?.focus(), 100);
     }
-  }, [isAuthError]);
+  }, [erroExterno, tentou, isAuthError]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,8 +65,8 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) return setErro("Digite seu Nickname.");
-    if (mostrarCodigo && !codigo.trim()) return setErro("Digite o código de acesso.");
     setErro("");
+    setTentou(true);
     onEntrar(nome.trim(), currentAvatar, codigo.trim());
   };
 
@@ -145,7 +148,7 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
               />
             </div>
 
-            {/* Código de acesso — visível quando necessário */}
+            {/* Código de acesso — aparece se necessário */}
             <AnimatePresence>
               {mostrarCodigo && (
                 <motion.div
@@ -162,15 +165,15 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
                     ref={codigoRef}
                     value={codigo}
                     onChange={e => { setCodigo(e.target.value); setErro(""); }}
-                    placeholder="Código do servidor"
-                    className={`h-12 border-white/10 bg-[#0b0c16] px-4 text-base placeholder:text-stone-600 focus-visible:ring-fuchsia-500/50 ${isAuthError ? "border-rose-500/50 focus-visible:ring-rose-500/50" : ""}`}
+                    placeholder="Código do servidor (opcional)"
+                    className="h-12 border-white/10 bg-[#0b0c16] px-4 text-base placeholder:text-stone-600 focus-visible:ring-fuchsia-500/50"
                   />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Link para mostrar o campo de código manualmente */}
+          {/* Link para mostrar campo de código manualmente */}
           {!mostrarCodigo && (
             <button
               type="button"
@@ -182,9 +185,10 @@ export function GamingLogin({ codigoInicial, erroExterno, onBack, onEntrar }: Ga
             </button>
           )}
 
-          {mensagem && (
+          {/* Mensagem de erro — só aparece após primeira tentativa */}
+          {erroParaMostrar && (
             <p className={`rounded-lg p-3 text-center text-sm font-semibold ${isAuthError ? "bg-fuchsia-500/10 text-fuchsia-300" : "bg-rose-500/10 text-rose-400"}`}>
-              {isAuthError ? "🔑 " : ""}{isAuthError ? "Código incorreto ou necessário para entrar no servidor." : mensagem}
+              {isAuthError ? "🔑 Código incorreto. Peça o código para entrar." : erroParaMostrar}
             </p>
           )}
 
