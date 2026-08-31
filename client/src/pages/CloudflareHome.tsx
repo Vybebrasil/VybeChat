@@ -77,7 +77,6 @@ import { createLocalProfile, type LocalProfile } from "@/lib/local-profile";
 import { TeamLogin } from "@/components/TeamLogin";
 import { ModeSelection, type AppMode } from "@/components/ModeSelection";
 import { GamingLogin } from "@/components/GamingLogin";
-import { toProfileId, type TeamMember } from "@/lib/team-roster";
 import {
   bumpUnread,
   clearUnread,
@@ -1610,18 +1609,9 @@ export default function CloudflareHome() {
     setProfile(next);
   };
 
-  const entrarComoMembro = (pessoa: TeamMember, codigo: string) => {
-    // O id vem do Monday: o mesmo em qualquer aparelho, e e ele que define quem
-    // e administrador — sem depender do nome que a pessoa digitou.
-    guardarPerfil(
-      { id: toProfileId(pessoa.id), name: pessoa.name, photo: pessoa.photo },
-      codigo
-    );
-  };
-
-  const entrarPorNome = (valor: string, codigo: string) => {
+  const entrarPorNome = (valor: string, photo: string, codigo: string) => {
     const next = createLocalProfile(valor);
-    if (next) guardarPerfil(next, codigo);
+    if (next) guardarPerfil({ ...next, photo: photo || undefined }, codigo);
   };
 
   const editMessage = (messageId: string, content: string) =>
@@ -2337,11 +2327,11 @@ export default function CloudflareHome() {
 
     return (
       <TeamLogin
-        workerUrl={String(import.meta.env.VITE_REALTIME_WORKER_URL ?? "")}
         codigoInicial={workspaceCode}
         erroExterno={authError}
-        onEntrar={entrarComoMembro}
-        onEntrarPorNome={entrarPorNome}
+        onEntrar={(nome, photo, codigo) => {
+          entrarPorNome(nome, photo, codigo);
+        }}
         onBack={() => {
           setAuthError("");
           setAppMode(null);
